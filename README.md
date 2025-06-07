@@ -5,7 +5,7 @@ This is my project implementing a simple interpreted language.
 
 Temporary Features
 A "#" symbol is required before variable names in expression evaluation contexts (if, while, set)
-# Language Syntax
+## Language Syntax
 VAR  - declares a new variable
 VAR x; - creates a variable x with value 0
 VAR x = 5; - creates a variable x with value 5
@@ -36,7 +36,7 @@ PRINTLN x; - outputs the value of x and moves to the next line
 
 Временные особенности  
 Символ "#" обязателен перед названием переменных в контексте вычисления выражений (if, while, set)  
-# Синтаксис языка  
+## Синтаксис языка  
 VAR  - объявляет новую переменную  
 VAR x; - создаёт переменную x со значением 0  
 VAR x = 5; - создаёт переменную x со значением 5  
