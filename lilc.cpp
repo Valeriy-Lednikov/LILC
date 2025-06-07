@@ -152,7 +152,7 @@ public:
         }
     }
 
-    int findNextWord(const char *word) const
+    int foundNextWord(const char *word) const
     {
         for (int i = currentWord + 1; i < static_cast<int>(words.size()); ++i)
         {
@@ -164,7 +164,7 @@ public:
         return -1;
     }
 
-    int findPrevWord(const char *word) const
+    int foundPrevWord(const char *word) const
     {
         for (int i = currentWord - 1; i >= 0; --i)
         {
@@ -184,7 +184,7 @@ public:
         }
         else
         {
-            std::cerr << "gotoWord: invalid word index\n";
+            printError( "gotoWord: invalid word index\n");
             halt();
         }
     }
@@ -200,7 +200,7 @@ public:
 
         if (startWord < 0 || endWord >= (int)words.size() || startWord > endWord)
         {
-            std::cerr << "Invalid expression range\n";
+            printError( "Invalid expression range\n");
             return nullptr;
         }
 
@@ -235,7 +235,8 @@ public:
                 }
                 else
                 {
-                    std::cerr << "Variable " << varName << " not found.\n";
+                    std::string erText = "Variable " + std::string(varName) + "not found";
+                    printError( erText.c_str());
                     halt();
                     return nullptr;
                 }
@@ -256,7 +257,7 @@ public:
         return expressionBuffer;
     }
 
-    int findCloseBrace()
+    int foundCloseBrace()
     {
         int level = 0;
         {
@@ -283,7 +284,7 @@ public:
         }
     }
 
-    int findCloseParenthes()
+    int foundCloseParenthes()
     {
         int level = 0; // мы уже внутри первой {
         for (int i = currentWord + 1; i < (int)words.size(); ++i)
@@ -315,13 +316,13 @@ public:
 
     void _opCONTINUE()
     {
-        int closeBrace = findNextWord("}");
+        int closeBrace = foundNextWord("}");
         currentWord = closeBrace;
     }
 
     void _opBREAK()
     {
-        int closeBrace = findNextWord("}");
+        int closeBrace = foundNextWord("}");
         currentWord = closeBrace + 1;
         control.outLevel();
     }
@@ -334,7 +335,7 @@ public:
             const char *varName = getWord(1);
             if (!varName)
             { // Добавить условие корректности названия
-                  printError("VAR name not find\n", 1);
+                  printError("VAR name not found\n", 1);
                 halt();
             }
             if (!control.setVar(varName, 0))
@@ -351,22 +352,22 @@ public:
         const char *lineEnd = getWord(4);
         if (!varName)
         { // Добавить условие корректности названия
-            printError("VAR name not find\n", 1);
+            printError("VAR name not found\n", 1);
             halt();
         }
         if (!varSet)
         {
-            std::cerr << "VAR = no find\n";
+            printError( "VAR = no found\n");
             halt();
         }
         if (!valueStr)
         {
-            std::cerr << "VAR value not find\n";
+            printError( "VAR value not found\n");
             halt();
         }
         if (!lineEnd || std::strcmp(lineEnd, ";") != 0)
         {
-            printError("VAR \";\" not find\n",4);
+            printError("VAR \";\" not found\n",4);
             halt();
         }
         double value = std::atof(valueStr);
@@ -387,12 +388,12 @@ public:
             const char *lineEnd = getWord(4);
             if (!isTextClose || std::strcmp(isTextClose, "\"") != 0)
             {
-                printError("PRINT TEXT \" CLOSE not find", 3);
+                printError("PRINT TEXT \" CLOSE not found", 3);
                 halt();
             }
             if (!lineEnd || std::strcmp(lineEnd, ";") != 0)
             {
-                printError("PRINT TEXT\";\" not find", 4);
+                printError("PRINT TEXT\";\" not found", 4);
                 halt();
             }
 
@@ -408,12 +409,12 @@ public:
         const char *lineEnd = getWord(2);
         if (!varName)
         { // Добавить условие корректности названия
-            printError("PRINT VAR name not find", 1);
+            printError("PRINT VAR name not found", 1);
             halt();
         }
         if (!lineEnd || std::strcmp(lineEnd, ";") != 0)
         {
-            printError("PRINT VAR \";\" not find", 2);
+            printError("PRINT VAR \";\" not found", 2);
             halt();
         }
         double value;
@@ -426,7 +427,7 @@ public:
         }
         else
         {
-            printError("PRINT VAR variable name not find");
+            printError("PRINT VAR variable name not found");
         }
         currentWord += 3;
     }
@@ -526,12 +527,12 @@ public:
 
         if (!varName)
         { // Добавить условие корректности названия
-            std::cerr << "SET name not find\n";
+            printError( "SET name not found\n");
             halt();
         }
         if (!varSet)
         {
-            std::cerr << "SET = no find\n";
+            printError( "SET = no found\n");
             halt();
         }
 
@@ -540,24 +541,24 @@ public:
             const char *valueStr = getWord(3);
             if (!valueStr)
             {
-                std::cerr << "SET value not find\n";
+                printError( "SET value not found\n");
                 halt();
             }
             double value = std::atof(valueStr);
             if (!control.setVar(varName, value))
             {
-                printError("SET name not find", 1);
+                printError("SET name not found", 1);
             }
             currentWord += 4;
             return;
         }
         else
         {
-            int lineEndI = findNextWord(";");
+            int lineEndI = foundNextWord(";");
             double result = _fnEval(currentWord + 3, lineEndI - 1);
             if (!control.setVar(varName, result))
             {
-                printError("SET name not find", 1);
+                printError("SET name not found", 1);
             }
             currentWord = lineEndI;
             return;
@@ -566,16 +567,16 @@ public:
 
     void _opIF()
     {
-        int closeParenthes = findCloseParenthes();
-        int openBrace = findNextWord("{");
-        int closeBrace = findCloseBrace();
+        int closeParenthes = foundCloseParenthes();
+        int openBrace = foundNextWord("{");
+        int closeBrace = foundCloseBrace();
         const char *openParenthes = getWord(1);
 
         // std::cout << "close Parenthes " << closeParenthes << " openBrace " << openBrace << " closeBrace " << closeBrace << "\n";
 
         if (!openParenthes || std::strcmp(openParenthes, "(") != 0)
         {
-            printError("IF \"(\" not find", 1);
+            printError("IF \"(\" not found", 1);
             halt();
         }
         double result = _fnEval(currentWord + 2, closeParenthes - 1);
@@ -619,7 +620,7 @@ public:
             printError("ELSE \"{\" not found", 1);
             halt();
         }
-        int closeBrace = findCloseBrace();
+        int closeBrace = foundCloseBrace();
         DeepCode stack;
         stack.INword = currentWord + 1;
         stack.OUTword = closeBrace;
@@ -632,14 +633,14 @@ public:
 
     void _opWHILE()
     {
-        int closeParenthes = findCloseParenthes();
-        int openBrace = findNextWord("{");
-        int closeBrace = findCloseBrace();
+        int closeParenthes = foundCloseParenthes();
+        int openBrace = foundNextWord("{");
+        int closeBrace = foundCloseBrace();
         const char *openParenthes = getWord(1);
 
         if (!openParenthes || std::strcmp(openParenthes, "(") != 0)
         {
-            printError("WHILE \"(\" not find", 1);
+            printError("WHILE \"(\" not found", 1);
             halt();
         }
         double result = _fnEval(currentWord + 2, closeParenthes - 1);
@@ -696,7 +697,7 @@ public:
             if (std::strcmp(word, "ELSE") == 0)
             {
                 // std::cout << "IF ok, next ELSE\n";
-                int closeELSE = findCloseBrace();
+                int closeELSE = foundCloseBrace();
                 currentWord = closeELSE + 1;
                 deepStack.pop_back();
                 control.outLevel();
@@ -874,7 +875,7 @@ private:
                 else
                 {
                     // Нет закрывающей кавычки — ошибка или остановка, в данном случае пропустим
-                    std::cerr << "Warning: string without closing quote\n";
+                    printError( "Warning: string without closing quote\n");
                 }
             }
             else
