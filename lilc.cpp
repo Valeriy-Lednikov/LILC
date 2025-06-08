@@ -8,6 +8,52 @@ extern "C"
 #include <cstring>
 #include <cctype>
 
+const static char *oneCharOperators = "><{}();,+-*/^%=\0";
+
+const static char *keywords_op[] = {
+    // Операторы
+    "==",
+    "!=",
+    ">=",
+    "<=",
+
+    // Функции
+    "abs",
+    "acos",
+    "asin",
+    "atan",
+    "atan2",
+    "ceil",
+    "cos",
+    "cosh",
+    "exp",
+    "fac",
+    "floor",
+    "ln",
+    "log",
+    "log10",
+    "ncr",
+    "npr",
+    "pi",
+    "pow",
+    "sin",
+    "sinh",
+    "sqrt",
+    "tan",
+    "tanh",
+
+    // Языковые операторы
+    "VAR",
+    "SET",
+    "IF",
+    "ELSE",
+    "WHILE",
+    "PRINTLN",
+    "PRINT",
+    "\0"
+
+};
+
 class lilc
 {
 private:
@@ -40,15 +86,66 @@ private:
 
     std::vector<DeepCode> deepStack; // Стек вложенности
 
+    bool isKeyword(const char *word)
+    {
+        for (int i = 0; keywords_op[i][0] != '\0'; ++i)
+        {
+            if (strcmp(word, keywords_op[i]) == 0)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool isOneCharOperator(char c)
+    {
+        for (int i = 0; oneCharOperators[i] != '\0'; ++i)
+        {
+            if (c == oneCharOperators[i])
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool isKeywordFull(const char *word)
+    {
+        for (int i = 0; keywords_op[i][0] != '\0'; ++i)
+        {
+            if (strcmp(word, keywords_op[i]) == 0)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool isKeywordPrefix(const char *word)
+    {
+        size_t len = strlen(word);
+        for (int i = 0; keywords_op[i][0] != '\0'; ++i)
+        {
+            if (strncmp(word, keywords_op[i], len) == 0)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+
 public:
     ~lilc()
     {
-        if (program)
-            delete[] program;
-        for (auto word : words)
-        {
-            delete[] word;
-        }
+        // if (program)
+        //     delete[] program;
+        // for (auto word : words)
+        // {
+        //     delete[] word;
+        // }
     }
 
     void printDeepStack() const
@@ -184,7 +281,7 @@ public:
         }
         else
         {
-            printError( "gotoWord: invalid word index\n");
+            printError("gotoWord: invalid word index\n");
             halt();
         }
     }
@@ -200,7 +297,7 @@ public:
 
         if (startWord < 0 || endWord >= (int)words.size() || startWord > endWord)
         {
-            printError( "Invalid expression range\n");
+            printError("Invalid expression range\n");
             return nullptr;
         }
 
@@ -236,7 +333,7 @@ public:
                 else
                 {
                     std::string erText = "Variable " + std::string(varName) + "not found";
-                    printError( erText.c_str());
+                    printError(erText.c_str());
                     halt();
                     return nullptr;
                 }
@@ -335,7 +432,7 @@ public:
             const char *varName = getWord(1);
             if (!varName)
             { // Добавить условие корректности названия
-                  printError("VAR name not found\n", 1);
+                printError("VAR name not found\n", 1);
                 halt();
             }
             if (!control.setVar(varName, 0))
@@ -357,17 +454,17 @@ public:
         }
         if (!varSet)
         {
-            printError( "VAR = no found\n");
+            printError("VAR = no found\n");
             halt();
         }
         if (!valueStr)
         {
-            printError( "VAR value not found\n");
+            printError("VAR value not found\n");
             halt();
         }
         if (!lineEnd || std::strcmp(lineEnd, ";") != 0)
         {
-            printError("VAR \";\" not found\n",4);
+            printError("VAR \";\" not found\n", 4);
             halt();
         }
         double value = std::atof(valueStr);
@@ -527,12 +624,12 @@ public:
 
         if (!varName)
         { // Добавить условие корректности названия
-            printError( "SET name not found\n");
+            printError("SET name not found\n");
             halt();
         }
         if (!varSet)
         {
-            printError( "SET = no found\n");
+            printError("SET = no found\n");
             halt();
         }
 
@@ -541,7 +638,7 @@ public:
             const char *valueStr = getWord(3);
             if (!valueStr)
             {
-                printError( "SET value not found\n");
+                printError("SET value not found\n");
                 halt();
             }
             double value = std::atof(valueStr);
@@ -801,103 +898,64 @@ public:
 
 private:
 private:
-    void parseProgram()
+void parseProgram() 
+{
+    char buffer[512];
+    int bufIndex = 0;
+
+    auto flushBuffer = [&]()
     {
-        const char *p = program;
-        while (*p)
+        if (bufIndex > 0)
         {
-            // Пропустить пробельные символы
-            while (std::isspace(*p))
-                ++p;
+            buffer[bufIndex] = '\0';
+            words.push_back(strdup(buffer));
+            bufIndex = 0;
+        }
+    };
 
-            if (*p == '\0')
-                break;
-
-            if (*p == ';')
+    while (*program)
+    {
+        if (*program == '"')
+        {
+            flushBuffer();
+            words.push_back(strdup("\""));
+            ++program;
+            char strBuffer[512];
+            int strIndex = 0;
+            while (*program && *program != '"' && strIndex < 511)
             {
-                // Обработка точки с запятой как отдельного слова
-                char *word = new char[2];
-                word[0] = ';';
-                word[1] = '\0';
-                words.push_back(word);
-                ++p;
+                strBuffer[strIndex++] = *program++;
             }
-            else if (*p == '"')
+            strBuffer[strIndex] = '\0';
+            words.push_back(strdup(strBuffer));
+            if (*program == '"')
             {
-                // Строка в кавычках
-                // Сохраняем открывающую кавычку как отдельное слово
-                char *openQuote = new char[2];
-                openQuote[0] = '"';
-                openQuote[1] = '\0';
-                words.push_back(openQuote);
-                ++p; // Перемещаемся за открывающую кавычку
-
-                const char *start = p;
-                std::string strContent;
-
-                while (*p)
-                {
-                    if (*p == '\\' && *(p + 1) == '"')
-                    {
-                        // Экранированная кавычка
-                        strContent += '"';
-                        p += 2;
-                    }
-                    else if (*p == '"')
-                    {
-                        // Найдена закрывающая кавычка
-                        break;
-                    }
-                    else
-                    {
-                        strContent += *p;
-                        ++p;
-                    }
-                }
-
-                // Сохраняем содержимое строки
-                if (!strContent.empty())
-                {
-                    char *innerWord = new char[strContent.size() + 1];
-                    std::strcpy(innerWord, strContent.c_str());
-                    words.push_back(innerWord);
-                }
-
-                if (*p == '"')
-                {
-                    // Сохраняем закрывающую кавычку как отдельное слово
-                    char *closeQuote = new char[2];
-                    closeQuote[0] = '"';
-                    closeQuote[1] = '\0';
-                    words.push_back(closeQuote);
-                    ++p; // Перемещаемся за закрывающую кавычку
-                }
-                else
-                {
-                    // Нет закрывающей кавычки — ошибка или остановка, в данном случае пропустим
-                    printError( "Warning: string without closing quote\n");
-                }
-            }
-            else
-            {
-                // Обычное слово (до пробела или ;)
-                const char *start = p;
-                while (*p && !std::isspace(*p) && *p != ';' && *p != '"')
-                {
-                    ++p;
-                }
-
-                size_t len = p - start;
-                if (len > 0)
-                {
-                    char *word = new char[len + 1];
-                    std::strncpy(word, start, len);
-                    word[len] = '\0';
-                    words.push_back(word);
-                }
-
-                // Если после слова идет ; или ", не забудем обработать их на следующем шаге
+                words.push_back(strdup("\""));
+                ++program;
             }
         }
+        else if (isspace(*program))
+        {
+            flushBuffer();
+            ++program;
+        }
+        else if (isOneCharOperator(*program))
+        {
+            flushBuffer();
+            char op[2] = {*program, '\0'};
+            words.push_back(strdup(op));
+            ++program;
+        }
+        else
+        {
+            // Ловушка: мы должны аккуратно добавить символ, если не конец строки
+            if (bufIndex < sizeof(buffer) - 1) // чтобы не вылезти за предел
+            {
+                buffer[bufIndex++] = *program;
+            }
+            ++program;
+        }
     }
+    flushBuffer();
+}
 };
