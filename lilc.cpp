@@ -10,6 +10,33 @@ extern "C"
 
 const static char *oneCharOperators = "><{}();,+-*/^%=\0";
 
+const static char *tiny_key[] = {
+    "abs",
+    "acos",
+    "asin",
+    "atan",
+    "atan2",
+    "ceil",
+    "cos",
+    "cosh",
+    "exp",
+    "fac",
+    "floor",
+    "ln",
+    "log",
+    "log10",
+    "ncr",
+    "npr",
+    "pi",
+    "pow",
+    "sin",
+    "sinh",
+    "sqrt",
+    "tan",
+    "tanh",
+    "\0",
+};
+
 const static char *keywords_op[] = {
     // Операторы
     "==",
@@ -135,7 +162,16 @@ private:
         return false;
     }
 
-
+    bool isTinyKey(const char *word)
+    {
+        // tiny_key объявлен где-то в том же файле или во внешней области видимости
+        for (int i = 0; tiny_key[i][0] != '\0'; ++i)
+        {
+            if (std::strcmp(word, tiny_key[i]) == 0)
+                return true;
+        }
+        return false;
+    }
 
 public:
     ~lilc()
@@ -295,19 +331,16 @@ public:
             expressionBuffer = nullptr;
         }
 
-        if (startWord < 0 || endWord >= (int)words.size() || startWord > endWord)
+        if (startWord < 0 || endWord >= static_cast<int>(words.size()) || startWord > endWord)
         {
             printError("Invalid expression range\n");
             return nullptr;
         }
 
-        // Оцениваем грубо размер (переменные максимум увеличатся до 32 знаков)
+        // Ориентировочный расчёт необходимого размера
         size_t totalLength = 0;
         for (int i = startWord; i <= endWord; ++i)
-        {
-            totalLength += std::strlen(words[i]) + 32; // запас под замену переменной на число
-            // Убираем подсчет пробелов! Пробелов между словами не будет
-        }
+            totalLength += std::strlen(words[i]) + 32;
 
         expressionBuffer = new char[totalLength + 1];
         char *ptr = expressionBuffer;
@@ -315,42 +348,49 @@ public:
         for (int i = startWord; i <= endWord; ++i)
         {
             const char *word = words[i];
-            if (word[0] == '#')
-            {
-                // Это переменная, убираем #
-                const char *varName = word + 1;
+            size_t len = std::strlen(word);
 
+            // 1) Функции tiny_key
+            if (isTinyKey(word))
+            {
+                std::memcpy(ptr, word, len);
+                ptr += len;
+            }
+            // 2) Языковые ключевые слова (VAR, IF, ELSE, PRINTLN и т.п.)
+            else if (isKeyword(word))
+            {
+                std::memcpy(ptr, word, len);
+                ptr += len;
+            }
+            // 3) Однобуквенные операторы и знаки
+            else if (len == 1 && isOneCharOperator(word[0]))
+            {
+                *ptr++ = word[0];
+            }
+            // 4) Всё остальное — переменная: подставляем её значение
+            else
+            {
                 double value;
-                if (control.getVar(varName, value))
+                if (control.getVar(word, value))
                 {
-                    // Переводим double в строку
                     char valueStr[64];
-                    std::snprintf(valueStr, sizeof(valueStr), "%g", value); // Компактный вывод double
-                    size_t len = std::strlen(valueStr);
-                    std::memcpy(ptr, valueStr, len);
-                    ptr += len;
+                    std::snprintf(valueStr, sizeof(valueStr), "%g", value);
+                    size_t vlen = std::strlen(valueStr);
+                    std::memcpy(ptr, valueStr, vlen);
+                    ptr += vlen;
                 }
                 else
                 {
-                    std::string erText = "Variable " + std::string(varName) + "not found";
-                    printError(erText.c_str());
+                    std::string er = "Variable '" + std::string(word) + "' not found";
+                    printError(er.c_str());
                     halt();
                     return nullptr;
                 }
             }
-            else
-            {
-                // Обычное слово
-                size_t len = std::strlen(word);
-                std::memcpy(ptr, word, len);
-                ptr += len;
-            }
-
-            // Убираем добавление пробела!
+            // без пробелов между частями
         }
-        *ptr = '\0'; // Завершаем строку
 
-        // std::cout << "Expr " << expressionBuffer << "\n"; // Отладочный вывод
+        *ptr = '\0';
         return expressionBuffer;
     }
 
@@ -898,64 +938,64 @@ public:
 
 private:
 private:
-void parseProgram() 
-{
-    char buffer[512];
-    int bufIndex = 0;
-
-    auto flushBuffer = [&]()
+    void parseProgram()
     {
-        if (bufIndex > 0)
-        {
-            buffer[bufIndex] = '\0';
-            words.push_back(strdup(buffer));
-            bufIndex = 0;
-        }
-    };
+        char buffer[512];
+        int bufIndex = 0;
 
-    while (*program)
-    {
-        if (*program == '"')
+        auto flushBuffer = [&]()
         {
-            flushBuffer();
-            words.push_back(strdup("\""));
-            ++program;
-            char strBuffer[512];
-            int strIndex = 0;
-            while (*program && *program != '"' && strIndex < 511)
+            if (bufIndex > 0)
             {
-                strBuffer[strIndex++] = *program++;
+                buffer[bufIndex] = '\0';
+                words.push_back(strdup(buffer));
+                bufIndex = 0;
             }
-            strBuffer[strIndex] = '\0';
-            words.push_back(strdup(strBuffer));
+        };
+
+        while (*program)
+        {
             if (*program == '"')
             {
+                flushBuffer();
                 words.push_back(strdup("\""));
+                ++program;
+                char strBuffer[512];
+                int strIndex = 0;
+                while (*program && *program != '"' && strIndex < 511)
+                {
+                    strBuffer[strIndex++] = *program++;
+                }
+                strBuffer[strIndex] = '\0';
+                words.push_back(strdup(strBuffer));
+                if (*program == '"')
+                {
+                    words.push_back(strdup("\""));
+                    ++program;
+                }
+            }
+            else if (isspace(*program))
+            {
+                flushBuffer();
+                ++program;
+            }
+            else if (isOneCharOperator(*program))
+            {
+                flushBuffer();
+                char op[2] = {*program, '\0'};
+                words.push_back(strdup(op));
+                ++program;
+            }
+            else
+            {
+                // Ловушка: мы должны аккуратно добавить символ, если не конец строки
+                if (bufIndex < sizeof(buffer) - 1) // чтобы не вылезти за предел
+                {
+                    buffer[bufIndex++] = *program;
+                }
                 ++program;
             }
         }
-        else if (isspace(*program))
-        {
-            flushBuffer();
-            ++program;
-        }
-        else if (isOneCharOperator(*program))
-        {
-            flushBuffer();
-            char op[2] = {*program, '\0'};
-            words.push_back(strdup(op));
-            ++program;
-        }
-        else
-        {
-            // Ловушка: мы должны аккуратно добавить символ, если не конец строки
-            if (bufIndex < sizeof(buffer) - 1) // чтобы не вылезти за предел
-            {
-                buffer[bufIndex++] = *program;
-            }
-            ++program;
-        }
+        flushBuffer();
     }
-    flushBuffer();
-}
 };

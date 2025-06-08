@@ -1,0 +1,9 @@
+VAR x=2;
+VAR y=3;
+VAR res;
+IF(y>x){
+    PRINTLN " \"1\" ";
+}
+ELSE {
+    PRINTLN " \"0\" ";
+}
