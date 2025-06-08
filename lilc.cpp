@@ -927,7 +927,11 @@ public:
     {
         for (size_t i = 0; i < words.size(); ++i)
         {
-            std::cout << i << ": " << words[i] << std::endl;
+            std::cout << i << ": ";
+            for (int j = 0; j < std::strlen(words[i]); j++){
+                std::cout << words[i][j];
+            }
+            std::cout << std::endl;
         }
     }
 
@@ -938,64 +942,93 @@ public:
 
 private:
 private:
-    void parseProgram()
+void parseProgram()
+{
+    char buffer[512];
+    int bufIndex = 0;
+
+    auto flushBuffer = [&]()
     {
-        char buffer[512];
-        int bufIndex = 0;
-
-        auto flushBuffer = [&]()
+        if (bufIndex > 0)
         {
-            if (bufIndex > 0)
-            {
-                buffer[bufIndex] = '\0';
-                words.push_back(strdup(buffer));
-                bufIndex = 0;
-            }
-        };
+            buffer[bufIndex] = '\0';
+            words.push_back(strdup(buffer));
+            bufIndex = 0;
+        }
+    };
 
-        while (*program)
+    while (*program)
+    {
+        if (*program == '"')
         {
-            if (*program == '"')
-            {
-                flushBuffer();
-                words.push_back(strdup("\""));
-                ++program;
-                char strBuffer[512];
-                int strIndex = 0;
-                while (*program && *program != '"' && strIndex < 511)
+            // 1) Закрываем предыдущий токен, если он есть
+            flushBuffer();
+
+            // 2) Открывающая кавычка как отдельный токен
+            words.push_back(strdup("\""));
+            ++program;
+
+            // 3) Собираем содержимое строки с поддержкой любого экранирования
+            char strBuffer[512];
+            int strIndex = 0;
+
+            while (*program && strIndex < (int)sizeof(strBuffer) - 1)
+            {   
+               
+                if (*program == '\\' && program[1] != '\0')
                 {
+                    
+                    // встретили '\' — значит экранирование: копируем '\' и следующий символ
+                    *program++;
                     strBuffer[strIndex++] = *program++;
                 }
-                strBuffer[strIndex] = '\0';
-                words.push_back(strdup(strBuffer));
-                if (*program == '"')
+                else if (*program == '"')
                 {
-                    words.push_back(strdup("\""));
-                    ++program;
+                    // настоящая кавычка — конец литерала
+                    break;
+                }
+                else
+                {
+                    // обычный символ
+                    strBuffer[strIndex++] = *program++;
                 }
             }
-            else if (isspace(*program))
+
+            // 4) Завершаем строковый буфер и сохраняем как отдельный токен
+            strBuffer[strIndex] = '\0';
+            words.push_back(strdup(strBuffer));
+
+            // 5) Закрывающая кавычка как отдельный токен
+            if (*program == '"')
             {
-                flushBuffer();
-                ++program;
-            }
-            else if (isOneCharOperator(*program))
-            {
-                flushBuffer();
-                char op[2] = {*program, '\0'};
-                words.push_back(strdup(op));
-                ++program;
-            }
-            else
-            {
-                // Ловушка: мы должны аккуратно добавить символ, если не конец строки
-                if (bufIndex < sizeof(buffer) - 1) // чтобы не вылезти за предел
-                {
-                    buffer[bufIndex++] = *program;
-                }
+                words.push_back(strdup("\""));
                 ++program;
             }
         }
-        flushBuffer();
+        else if (isspace(*program))
+        {
+            // пробел/перевод строки — разделитель
+            flushBuffer();
+            ++program;
+        }
+        else if (isOneCharOperator(*program))
+        {
+            // операторы одиночного символа тоже отдельные токены
+            flushBuffer();
+            char op[2] = { *program, '\0' };
+            words.push_back(strdup(op));
+            ++program;
+        }
+        else
+        {
+            // часть обычного идентификатора/числа/слова
+            if (bufIndex < (int)sizeof(buffer) - 1)
+                buffer[bufIndex++] = *program;
+            ++program;
+        }
     }
+
+    // последний буфер
+    flushBuffer();
+}
 };
