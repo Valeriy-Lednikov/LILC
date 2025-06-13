@@ -1,1 +1,10 @@
-VAR x=4;VAR y=3;VAR res;SET res = x+y;IF(y>x){PRINTLN res;}ELSE {PRINTLN "\"0\"";}
+VAR x=4;
+VAR y=3;
+VAR res;
+SET res = x+y;
+IF(y>x){
+    PRINTLN res;
+}
+ELSE {
+    PRINTLN "\"0\"";
+}  
