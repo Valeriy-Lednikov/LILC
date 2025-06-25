@@ -76,6 +76,8 @@ const static char *keywords_op[] = {
     "SET",
     "IF",
     "ELSE",
+    "FN",
+    "PROC",
     "WHILE",
     "PRINTLN",
     "PRINT",
@@ -100,7 +102,7 @@ private:
         IF = 1,
         ELSE = 2,
         WHILE = 3,
-        FUNK = 4 // функция (пока отложим)
+        PROC = 4 // функция (пока отложим)
     };
 
     struct DeepCode
@@ -110,6 +112,7 @@ private:
         int EXPRend = -1;   // выражение условия (например, условие if/while)
         int INword = -1;    // номер слова открытия {
         int OUTword = -1;   // номер слова закрытия }
+        int RETword = -1;   // слово на которое нужно вернуться после выхода из }
     };
 
     std::vector<DeepCode> deepStack; // Стек вложенности
@@ -210,8 +213,8 @@ public:
             case WHILE:
                 typeStr = "WHILE";
                 break;
-            case FUNK:
-                typeStr = "FUNK";
+            case PROC:
+                typeStr = "PROC";
                 break;
             default:
                 typeStr = "UNKNOWN";
@@ -324,6 +327,24 @@ public:
             printError("gotoWord: invalid word index\n");
             halt();
         }
+    }
+
+    int findPROC(const char *name)
+    {
+        for (int i = 0; i < words.size(); i++)
+        {
+            if (std::strcmp(words[i], name) == 0)
+            {
+                
+                if (std::strcmp(words[i-1], "PROC") == 0)
+                {
+                    //std::cout << "FIND PROC ON " << i << "\n";
+                    return i;
+                }
+            }
+        }
+
+        return -1;
     }
 
     const char *getExpression(int startWord, int endWord)
@@ -580,7 +601,7 @@ public:
         double value;
         if (control.getVar(varName, value))
         {
-           if (ln)
+            if (ln)
             {
                 if (printOut)
                 {
@@ -694,9 +715,9 @@ public:
 
     void _opSet()
     {
-        const char *islineEnd = getWord(4);
-        const char *varName = getWord(1);
-        const char *varSet = getWord(2);
+        const char *islineEnd = getWord(3);
+        const char *varName = getWord(0);
+        const char *varSet = getWord(1);
 
         if (!varName)
         { // Добавить условие корректности названия
@@ -728,7 +749,7 @@ public:
         else
         {
             int lineEndI = foundNextWord(";");
-            double result = _fnEval(currentWord + 3, lineEndI - 1);
+            double result = _fnEval(currentWord + 2, lineEndI - 1);
             if (!control.setVar(varName, result))
             {
                 printError("SET name not found", 1);
@@ -804,6 +825,12 @@ public:
         control.inLevel();
     }
 
+    void _opPROC()
+    {
+        int closeBrace = foundCloseBrace();
+        currentWord = closeBrace + 1;
+    }
+
     void _opWHILE()
     {
         int closeParenthes = foundCloseParenthes();
@@ -847,6 +874,12 @@ public:
     void _opCLOSEBRACE()
     {
         // std::cout << "last type " << deepStack[deepStack.size()-1].type << " size " << deepStack.size() << "\n";
+        if (deepStack[deepStack.size() - 1].type == DeepType::PROC)
+        {
+            currentWord = deepStack[deepStack.size() - 1].RETword;
+            deepStack.pop_back();
+            return;
+        }
 
         if (deepStack[deepStack.size() - 1].type == DeepType::WHILE)
         {
@@ -910,7 +943,17 @@ public:
         {
             _opPrint(1);
         }
-        else if (std::strcmp(word, "SET") == 0)
+        else if (findPROC(word) != -1)
+        {
+            
+            DeepCode t;
+            t.RETword = currentWord + 1;
+            t.type = DeepType::PROC;
+            deepStack.push_back(t);
+            int gotoPROC = findPROC(word);
+            currentWord = gotoPROC + 2; // name { ...
+        }
+        else if (control.findVar(word))
         {
             _opSet();
         }
@@ -937,6 +980,10 @@ public:
         else if (std::strcmp(word, "HALT") == 0)
         {
             halt();
+        }
+        else if (std::strcmp(word, "PROC") == 0)
+        {
+            _opPROC();
         }
         else
         {
@@ -975,7 +1022,8 @@ public:
     void printError(const char *text, int word = 0)
     {
         std::string t = "ERROR in word <" + std::to_string(currentWord) + std::to_string(word) + "><" + words[currentWord + word] + ">" + " - \n" + text + "\n";
-        if (printOut) {
+        if (printOut)
+        {
             printOut(t);
         }
         std::cout << "ERROR in word <" << currentWord + word << "><" << words[currentWord + word] << ">" << " - " << text << "\n";

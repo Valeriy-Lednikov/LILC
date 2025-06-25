@@ -108,6 +108,17 @@ public:
         return false; // Переменная не найдена
     }
 
+    bool findVar(const char* name)  {
+        for (int level = currentLevel; level >= 0; --level) {
+            for (const auto& var : vars[level]) {
+                if (std::strcmp(var.name, name) == 0) {
+                    return true;
+                }
+            }
+        }
+        return false; // Переменная не найдена
+    }
+
     const std::vector<variable>& getVarsAtLevel(int level) {
         return vars[level];
     }

@@ -1,10 +1,16 @@
 VAR x=4;
-VAR y=3;
+VAR y=5;
 VAR res;
-SET res = x+y;
+res = x+2 + y;
 IF(y>x){
     PRINTLN res;
+    test;
+    PRINTLN "Return work!";
 }
 ELSE {
     PRINTLN "\"0\"";
 }  
+
+PROC test{
+    PRINTLN "procedure call";
+}
