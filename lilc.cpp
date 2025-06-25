@@ -8,6 +8,7 @@ extern "C"
 #include <cstring>
 #include <cctype>
 #include <functional>
+#include <string>
 
 const static char *oneCharOperators = "><{}();,+-*/^%=\0";
 
@@ -175,7 +176,7 @@ private:
 
 public:
     bool isHalted = false;
-    std::function<void(const std::string&)> printOut;
+    std::function<void(const std::string &)> printOut;
 
     ~lilc()
     {
@@ -359,18 +360,24 @@ public:
                 std::memcpy(ptr, word, len);
                 ptr += len;
             }
-            // 2) Языковые ключевые слова (VAR, IF, ELSE, PRINTLN и т.п.)
+            // 2) Ключевые слова языка
             else if (isKeyword(word))
             {
                 std::memcpy(ptr, word, len);
                 ptr += len;
             }
-            // 3) Однобуквенные операторы и знаки
+            // 3) Однобуквенные операторы
             else if (len == 1 && isOneCharOperator(word[0]))
             {
                 *ptr++ = word[0];
             }
-            // 4) Всё остальное — переменная: подставляем её значение
+            // 4) Число: если начинается с цифры
+            else if (std::isdigit(static_cast<unsigned char>(word[0])))
+            {
+                std::memcpy(ptr, word, len);
+                ptr += len;
+            }
+            // 5) Остальное — переменная
             else
             {
                 double value;
@@ -573,10 +580,23 @@ public:
         double value;
         if (control.getVar(varName, value))
         {
-            if (ln)
+           if (ln)
+            {
+                if (printOut)
+                {
+                    std::string t = std::to_string(value) + "\n";
+                    printOut(t);
+                }
                 std::cout << value << std::endl;
+            }
             else
+            {
+                if (printOut)
+                {
+                    printOut(std::to_string(value));
+                }
                 std::cout << value;
+            }
         }
         else
         {
@@ -954,6 +974,10 @@ public:
 
     void printError(const char *text, int word = 0)
     {
+        std::string t = "ERROR in word <" + std::to_string(currentWord) + std::to_string(word) + "><" + words[currentWord + word] + ">" + " - \n" + text + "\n";
+        if (printOut) {
+            printOut(t);
+        }
         std::cout << "ERROR in word <" << currentWord + word << "><" << words[currentWord + word] << ">" << " - " << text << "\n";
     }
 
