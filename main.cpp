@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
     if (text) {
     interpreter.loadProgram(text);
 
-    //interpreter.printWords();
+    interpreter.printWords();
     interpreter.interpretate();
 
     }

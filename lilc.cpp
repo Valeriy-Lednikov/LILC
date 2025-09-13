@@ -10,7 +10,7 @@ extern "C"
 #include <functional>
 #include <string>
 
-const static char *oneCharOperators = "><{}();,+-*/^%=\0";
+const static char *oneCharOperators = "[]><{}();,+-*/^%=\0";
 
 const static char *tiny_key[] = {
     "abs",
@@ -78,6 +78,7 @@ const static char *keywords_op[] = {
     "ELSE",
     "FN",
     "PROC",
+    "RETURN"
     "WHILE",
     "PRINTLN",
     "PRINT",
@@ -175,6 +176,31 @@ private:
                 return true;
         }
         return false;
+    }
+
+    bool compareChar(const char *str1, const char *str2)
+    {
+        char c1 = str1[0];
+        int code1 = static_cast<int>(c1);
+        char c2 = str2[0];
+        int code2 = static_cast<int>(c2);
+        if (code1 == code2)
+        {
+            return true;
+        }
+        return false;
+    }
+
+    bool isNumber(const char *s)
+    {
+        if (!s || *s == '\0')
+            return false; // пустая строка
+        for (const char *p = s; *p; ++p)
+        {
+            if (!std::isdigit(*p))
+                return false;
+        }
+        return true;
     }
 
 public:
@@ -335,10 +361,10 @@ public:
         {
             if (std::strcmp(words[i], name) == 0)
             {
-                
-                if (std::strcmp(words[i-1], "PROC") == 0)
+
+                if (std::strcmp(words[i - 1], "PROC") == 0)
                 {
-                    //std::cout << "FIND PROC ON " << i << "\n";
+                    // std::cout << "FIND PROC ON " << i << "\n";
                     return i;
                 }
             }
@@ -398,7 +424,77 @@ public:
                 std::memcpy(ptr, word, len);
                 ptr += len;
             }
-            // 5) Остальное — переменная
+            // 5) Обращение к массиву:  name [ index ]
+            else if (i + 3 <= endWord && std::strcmp(words[i + 1], "[") == 0 && std::strcmp(words[i + 3], "]") == 0)
+            {
+                const char *arrName = word;
+                const char *idxTok = words[i + 2];
+
+                // Разбираем индекс: число или переменная
+                size_t idx = 0;
+                bool idxOk = false;
+
+                if (std::isdigit(static_cast<unsigned char>(idxTok[0])))
+                {
+                    // Убедимся, что весь токен — цифры, и аккуратно соберём индекс
+                    idxOk = true;
+                    for (const char *p = idxTok; *p; ++p)
+                    {
+                        if (!std::isdigit(static_cast<unsigned char>(*p)))
+                        {
+                            idxOk = false;
+                            break;
+                        }
+                        idx = idx * 10 + static_cast<size_t>(*p - '0');
+                    }
+                    if (!idxOk)
+                    {
+                        std::string er = "Invalid array index token '" + std::string(idxTok) + "'";
+                        printError(er.c_str());
+                        halt();
+                        return nullptr;
+                    }
+                }
+                else
+                {
+                    // Индекс — имя переменной
+                    double idxVal = 0.0;
+                    if (!control.getVar(idxTok, idxVal))
+                    {
+                        std::string er = "Variable '" + std::string(idxTok) + "' not found";
+                        printError(er.c_str());
+                        halt();
+                        return nullptr;
+                    }
+                    if (idxVal < 0)
+                    {
+                        printError("Array index must be >= 0");
+                        halt();
+                        return nullptr;
+                    }
+                    idx = static_cast<size_t>(idxVal);
+                    idxOk = true;
+                }
+
+                double elemValue = 0.0;
+                if (!control.getArrayElem(arrName, idx, elemValue))
+                {
+                    std::string er = "Array element '" + std::string(arrName) + "[" + std::to_string(idx) + "]' not found";
+                    printError(er.c_str());
+                    halt();
+                    return nullptr;
+                }
+
+                char valueStr[64];
+                std::snprintf(valueStr, sizeof(valueStr), "%g", elemValue);
+                size_t vlen = std::strlen(valueStr);
+                std::memcpy(ptr, valueStr, vlen);
+                ptr += vlen;
+
+                // Пропускаем [, index, ]
+                i += 3;
+            }
+            // 6) Остальное — переменная
             else
             {
                 double value;
@@ -515,9 +611,30 @@ public:
         }
 
         const char *varName = getWord(1);
+        const char *openSquare = getWord(2);
+        const char *closeSquare = getWord(4);
+        const char *lineEnd = getWord(5);
+        if (!varName)
+        { // Добавить условие корректности названия
+            printError("VAR name not found\n", 1);
+            halt();
+        }
+        if (std::strcmp(openSquare, "[") == 0)
+        {
+            if (std::strcmp(closeSquare, "]") == 0)
+            {
+                if (std::strcmp(lineEnd, ";") == 0)
+                {
+                    control.addArray(varName, std::stoi(getWord(3)));
+                    currentWord += 5;
+                    return;
+                }
+            }
+        }
+
         const char *varSet = getWord(2);
         const char *valueStr = getWord(3);
-        const char *lineEnd = getWord(4);
+        const char *lineEnd2 = getWord(4);
         if (!varName)
         { // Добавить условие корректности названия
             printError("VAR name not found\n", 1);
@@ -533,7 +650,7 @@ public:
             printError("VAR value not found\n");
             halt();
         }
-        if (!lineEnd || std::strcmp(lineEnd, ";") != 0)
+        if (!lineEnd2 || std::strcmp(lineEnd2, ";") != 0)
         {
             printError("VAR \";\" not found\n", 4);
             halt();
@@ -586,6 +703,18 @@ public:
             return;
         }
 
+        double value;
+    
+        bool isArray = false;
+
+        if (compareChar(getWord(2), "["))
+        {
+            if (compareChar(getWord(4), "]"))
+            {
+                isArray = true;
+            }
+        }
+
         const char *varName = getWord(1);
         const char *lineEnd = getWord(2);
         if (!varName)
@@ -593,37 +722,63 @@ public:
             printError("PRINT VAR name not found", 1);
             halt();
         }
-        if (!lineEnd || std::strcmp(lineEnd, ";") != 0)
+        // if ((!lineEnd || std::strcmp(lineEnd, ";") != 0) && index == -1)
+        // {
+        //     printError("PRINT VAR \";\" not found", 2);
+        //     halt();
+        // }
+        if (isArray == false)
         {
-            printError("PRINT VAR \";\" not found", 2);
-            halt();
-        }
-        double value;
-        if (control.getVar(varName, value))
-        {
-            if (ln)
+            if (!control.getVar(varName, value))
             {
-                if (printOut)
-                {
-                    std::string t = std::to_string(value) + "\n";
-                    printOut(t);
-                }
-                std::cout << value << std::endl;
-            }
-            else
-            {
-                if (printOut)
-                {
-                    printOut(std::to_string(value));
-                }
-                std::cout << value;
+
+                printError("PRINT VAR variable name not found");
+                halt();
             }
         }
         else
         {
-            printError("PRINT VAR variable name not found");
+
+            double index = -1;
+            if(isNumber(getWord(3))){
+                index = std::stoi(getWord(3));
+            }
+            else{
+                control.getVar(getWord(3), index);
+            }
+            
+            if (!control.getArrayElem(varName, int(index), value))
+            {
+                printError("PRINT VAR array name not found");
+                halt();
+            }
         }
-        currentWord += 3;
+
+        if (ln)
+        {
+            if (printOut)
+            {
+                std::string t = std::to_string(value) + "\n";
+                printOut(t);
+            }
+            std::cout << value << std::endl;
+        }
+        else
+        {
+            if (printOut)
+            {
+                printOut(std::to_string(value));
+            }
+            std::cout << value;
+        }
+        if (!isArray)
+        {
+            currentWord += 3;
+        }
+        else
+        {
+            currentWord += 5;
+        }
     }
 
     double _fnEval(int startWord, int endWord)
@@ -715,15 +870,48 @@ public:
 
     void _opSet()
     {
+        {
+            const char *varName = getWord(0);
+            const char *openSquare = getWord(1);
+            const char *closeSquare = getWord(3);
+            const char *varSet = getWord(4);
+
+            if (std::strcmp(openSquare, "[") == 0)
+            {
+                if (std::strcmp(closeSquare, "]") == 0)
+                {
+                    if (isNumber(getWord(2))) // Если пришло число в качестве индекса
+                    {
+                        int lineEndI = foundNextWord(";");
+                        int eqI = foundNextWord("=");
+                        double result = _fnEval(eqI + 1, lineEndI - 1);
+                        control.setArrayElem(varName, std::stoi(getWord(2)), result);
+                    }
+                    else
+                    {
+                        double t;
+                        control.getVar(getWord(2), t);
+                        int lineEndI = foundNextWord(";");
+                        int eqI = foundNextWord("=");
+                        double result = _fnEval(eqI + 1, lineEndI - 1);
+                        control.setArrayElem(varName, int(t), result);
+                    }
+                    int lineEndI = foundNextWord(";");
+                    currentWord = lineEndI;
+                    return;
+                }
+            }
+        }
+
         const char *islineEnd = getWord(3);
         const char *varName = getWord(0);
         const char *varSet = getWord(1);
 
-        if (!varName)
-        { // Добавить условие корректности названия
-            printError("SET name not found\n");
-            halt();
-        }
+        // if (!varName)
+        // { // Добавить условие корректности названия
+        //     printError("SET name not found\n");
+        //     halt();
+        // }
         if (!varSet)
         {
             printError("SET = no found\n");
@@ -871,6 +1059,15 @@ public:
         }
     }
 
+    void _opRETURN()
+    {
+        if (deepStack[deepStack.size() - 1].type == DeepType::PROC)
+        {
+            currentWord = deepStack[deepStack.size() - 1].RETword;
+            deepStack.pop_back();
+            return;
+        }
+    }
     void _opCLOSEBRACE()
     {
         // std::cout << "last type " << deepStack[deepStack.size()-1].type << " size " << deepStack.size() << "\n";
@@ -945,7 +1142,7 @@ public:
         }
         else if (findPROC(word) != -1)
         {
-            
+
             DeepCode t;
             t.RETword = currentWord + 1;
             t.type = DeepType::PROC;
@@ -953,7 +1150,7 @@ public:
             int gotoPROC = findPROC(word);
             currentWord = gotoPROC + 2; // name { ...
         }
-        else if (control.findVar(word))
+        else if (control.findVar(word) || control.findArray(word))
         {
             _opSet();
         }
@@ -984,6 +1181,10 @@ public:
         else if (std::strcmp(word, "PROC") == 0)
         {
             _opPROC();
+        }
+        else if (std::strcmp(word, "RETURN") == 0)
+        {
+            _opRETURN();
         }
         else
         {
@@ -1119,5 +1320,24 @@ private:
 
         // последний буфер
         flushBuffer();
+
+        // пост проход. Убираем !, = в !=
+        for (size_t i = 0; i + 1 < words.size();)
+        {
+            if (strcmp(words[i], "!") == 0 && strcmp(words[i + 1], "=") == 0)
+            {
+                // Заменяем "!" на "!="
+                free(words[i]); // освобождаем старую строку
+                words[i] = strdup("!=");
+
+                // Удаляем "="
+                free(words[i + 1]);
+                words.erase(words.begin() + i + 1);
+            }
+            else
+            {
+                ++i; // иначе двигаемся дальше
+            }
+        }
     }
 };

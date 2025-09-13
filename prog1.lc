@@ -1,16 +1,13 @@
-VAR x=4;
-VAR y=5;
-VAR res;
-res = x+2 + y;
-IF(y>x){
-    PRINTLN res;
-    test;
-    PRINTLN "Return work!";
+VAR x[10];
+VAR i = 0;
+WHILE(i < 10){
+    x[i] = i * i;
+    i = i+1;
 }
-ELSE {
-    PRINTLN "\"0\"";
-}  
-
-PROC test{
-    PRINTLN "procedure call";
+i = 0;
+WHILE(i < 10){
+    PRINTLN x[i];
+    i = i+1;
 }
+x[0] = 999;
+PRINTLN x[0];
