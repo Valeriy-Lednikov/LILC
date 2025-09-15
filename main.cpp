@@ -2,12 +2,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include "lilc.cpp"
+#include <chrono>
 
-
-
-const char* loadFile(const char* filename) {
-    FILE* file = std::fopen(filename, "rb"); // Открываем в бинарном режиме
-    if (!file) {
+const char *loadFile(const char *filename)
+{
+    FILE *file = std::fopen(filename, "rb"); // Открываем в бинарном режиме
+    if (!file)
+    {
         std::perror("Ошибка при открытии файла");
         return nullptr;
     }
@@ -18,8 +19,9 @@ const char* loadFile(const char* filename) {
     std::rewind(file);
 
     // Выделяем память (+1 байт под '\0')
-    char* buffer = (char*)std::malloc(size + 1);
-    if (!buffer) {
+    char *buffer = (char *)std::malloc(size + 1);
+    if (!buffer)
+    {
         std::fclose(file);
         std::fprintf(stderr, "Не удалось выделить память\n");
         return nullptr;
@@ -33,23 +35,54 @@ const char* loadFile(const char* filename) {
     return buffer; // Возвращаем указатель (нужно будет освободить вручную!)
 }
 
+void calc()
+{
+    int arr[10000] = {0}; // Инициализация нулями
+    int i = 0;
+    int j = 0;
 
-
-
+    while (j < 100)
+    {
+        while (i < 10000)
+        {
+            arr[i] = 1 + arr[i] * arr[i];
+            i = i + 1;
+        }
+        i = 0;
+        j = j + 1;
+    }
+}
 
 int main(int argc, char *argv[])
 {
-    const char* text = loadFile("prog1.lc");
+    const char *text = loadFile("prog1.lc");
     lilc interpreter;
-    
-    //interpreter.loadProgram("VAR x; WHILE ( #x < 10 ) { PRINTLN x ; IF ( #x == 5 ) { PRINTLN \"X5!\";} SET x = #x + 1;} ");
 
-    if (text) {
-    interpreter.loadProgram(text);
+    // interpreter.loadProgram("VAR x; WHILE ( #x < 10 ) { PRINTLN x ; IF ( #x == 5 ) { PRINTLN \"X5!\";} SET x = #x + 1;} ");
 
-    interpreter.printWords();
-    interpreter.interpretate();
+    if (text)
+    {
+        interpreter.loadProgram(text);
 
+        interpreter.printWords();
+
+
+        
+        {
+            auto start = std::chrono::high_resolution_clock::now();
+            interpreter.interpretate();
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double, std::milli> duration = end - start;
+            std::cout << "LILC: " << duration.count() << " ms" << std::endl;
+        }
+        {
+
+            auto start = std::chrono::high_resolution_clock::now();
+            calc();
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double, std::milli> duration = end - start;
+            std::cout << "C++: " << duration.count() << " ms" << std::endl;
+        }
     }
 
     // const char *c = "sqrt(5^2+7^2+11^2+(8-2)^2)";

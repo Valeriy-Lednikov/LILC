@@ -9,6 +9,7 @@ extern "C"
 #include <cctype>
 #include <functional>
 #include <string>
+#include <iomanip>
 
 const static char *oneCharOperators = "[]><{}();,+-*/^%=\0";
 
@@ -704,7 +705,7 @@ public:
         }
 
         double value;
-    
+
         bool isArray = false;
 
         if (compareChar(getWord(2), "["))
@@ -740,13 +741,15 @@ public:
         {
 
             double index = -1;
-            if(isNumber(getWord(3))){
+            if (isNumber(getWord(3)))
+            {
                 index = std::stoi(getWord(3));
             }
-            else{
+            else
+            {
                 control.getVar(getWord(3), index);
             }
-            
+
             if (!control.getArrayElem(varName, int(index), value))
             {
                 printError("PRINT VAR array name not found");
@@ -761,7 +764,7 @@ public:
                 std::string t = std::to_string(value) + "\n";
                 printOut(t);
             }
-            std::cout << value << std::endl;
+            std::cout << std::fixed << std::setprecision(15) << value << std::endl;
         }
         else
         {
@@ -769,7 +772,7 @@ public:
             {
                 printOut(std::to_string(value));
             }
-            std::cout << value;
+            std::cout << std::fixed << std::setprecision(15) << value;
         }
         if (!isArray)
         {
@@ -868,84 +871,127 @@ public:
         return te_interp(expr, 0);
     }
 
-    void _opSet()
+void _opSet()
+{
+    // Имя переменной обязательно
+    const char *name = getWord(0);
+    if (!name)
     {
+        printError("SET name not found\n");
+        halt();
+        return;
+    }
+
+    // Второй токен: либо '[' (массив), либо '=' (скаляр)
+    const char *t1 = getWord(1);
+    if (!t1)
+    {
+        printError("SET syntax error: missing token after name\n");
+        halt();
+        return;
+    }
+
+    // ---------- Ветка: присваивание элементу массива: name [ index ] = expr ;
+    if (t1[0] == '[' && t1[1] == '\0')
+    {
+        const char *idxTok = getWord(2);
+        const char *t3     = getWord(3); // ожидаем ']'
+        if (!idxTok || !t3 || !(t3[0] == ']' && t3[1] == '\0'))
         {
-            const char *varName = getWord(0);
-            const char *openSquare = getWord(1);
-            const char *closeSquare = getWord(3);
-            const char *varSet = getWord(4);
-
-            if (std::strcmp(openSquare, "[") == 0)
-            {
-                if (std::strcmp(closeSquare, "]") == 0)
-                {
-                    if (isNumber(getWord(2))) // Если пришло число в качестве индекса
-                    {
-                        int lineEndI = foundNextWord(";");
-                        int eqI = foundNextWord("=");
-                        double result = _fnEval(eqI + 1, lineEndI - 1);
-                        control.setArrayElem(varName, std::stoi(getWord(2)), result);
-                    }
-                    else
-                    {
-                        double t;
-                        control.getVar(getWord(2), t);
-                        int lineEndI = foundNextWord(";");
-                        int eqI = foundNextWord("=");
-                        double result = _fnEval(eqI + 1, lineEndI - 1);
-                        control.setArrayElem(varName, int(t), result);
-                    }
-                    int lineEndI = foundNextWord(";");
-                    currentWord = lineEndI;
-                    return;
-                }
-            }
-        }
-
-        const char *islineEnd = getWord(3);
-        const char *varName = getWord(0);
-        const char *varSet = getWord(1);
-
-        // if (!varName)
-        // { // Добавить условие корректности названия
-        //     printError("SET name not found\n");
-        //     halt();
-        // }
-        if (!varSet)
-        {
-            printError("SET = no found\n");
+            printError("SET array syntax error: missing ']' or index\n");
             halt();
+            return;
         }
 
-        if (std::strcmp(islineEnd, ";") == 0)
+        // Ищем '=' и ';' один раз
+        const int eqI  = foundNextWord("=");
+        const int endI = foundNextWord(";");
+        if (eqI < 0 || endI < 0 || eqI >= endI)
         {
-            const char *valueStr = getWord(3);
-            if (!valueStr)
-            {
-                printError("SET value not found\n");
-                halt();
-            }
-            double value = std::atof(valueStr);
-            if (!control.setVar(varName, value))
-            {
-                printError("SET name not found", 1);
-            }
-            currentWord += 4;
+            printError("SET array syntax error: '=' or ';' not found\n");
+            halt();
             return;
+        }
+
+        // Индекс: число или имя переменной
+        int idx;
+        if (isNumber(idxTok))
+        {
+            idx = (int)std::strtol(idxTok, 0, 10);
         }
         else
         {
-            int lineEndI = foundNextWord(";");
-            double result = _fnEval(currentWord + 2, lineEndI - 1);
-            if (!control.setVar(varName, result))
-            {
-                printError("SET name not found", 1);
-            }
-            currentWord = lineEndI;
+            double tmp = 0.0;
+            control.getVar(idxTok, tmp); // Предполагается, что внутри есть обработка ошибок
+            idx = (int)tmp;
+        }
+
+        // Вычисляем выражение справа от '='
+        const double value = _fnEval(eqI + 1, endI - 1);
+        control.setArrayElem(name, idx, value);
+
+        currentWord = endI;
+        return;
+    }
+
+    // ---------- Ветка: скалярное присваивание: name = ... ;
+    if (!(t1[0] == '=' && t1[1] == '\0'))
+    {
+        printError("SET '=' not found\n");
+        halt();
+        return;
+    }
+
+    // Быстрый путь: ровно 4 токена: name = value ;
+    const char *t3 = getWord(3);
+    if (t3 && t3[0] == ';' && t3[1] == '\0')
+    {
+        const char *rhs = getWord(2);
+        if (!rhs)
+        {
+            printError("SET value not found\n");
+            halt();
             return;
         }
+
+        // x = число;
+        if (isNumber(rhs))
+        {
+            const double v = std::strtod(rhs, 0);
+            if (!control.setVar(name, v))
+                printError("SET name not found", 1);
+
+            currentWord += 4; // name '=' value ';'
+            return;
+        }
+
+        // x = y;  (переменная справа)
+        // Это быстрее, чем вызывать общий вычислитель.
+        double tmp = 0.0;
+        control.getVar(rhs, tmp); // если переменной нет — ожидается внутренняя ошибка
+        if (!control.setVar(name, tmp))
+            printError("SET name not found", 1);
+
+        currentWord += 4;
+        return;
     }
+
+    // Общий случай: name = <выражение...> ;
+    const int endI = foundNextWord(";");
+    if (endI < 0)
+    {
+        printError("SET ';' not found\n");
+        halt();
+        return;
+    }
+
+    const double result = _fnEval(currentWord + 2, endI - 1);
+    if (!control.setVar(name, result))
+        printError("SET name not found", 1);
+
+    currentWord = endI;
+}
+
 
     void _opIF()
     {

@@ -1,13 +1,11 @@
-VAR x[10];
+VAR arr[10000];
 VAR i = 0;
-WHILE(i < 10){
-    x[i] = i * i;
-    i = i+1;
+VAR j = 0;
+WHILE (j < 100){
+WHILE (i < 10000){
+    arr[i] = 1 + arr[i] * arr[i];
+    i = i + 1;
 }
 i = 0;
-WHILE(i < 10){
-    PRINTLN x[i];
-    i = i+1;
+j = j + 1;
 }
-x[0] = 999;
-PRINTLN x[0];
