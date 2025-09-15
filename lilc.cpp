@@ -116,6 +116,20 @@ private:
         int INword = -1;    // номер слова открытия {
         int OUTword = -1;   // номер слова закрытия }
         int RETword = -1;   // слово на которое нужно вернуться после выхода из }
+
+        // fast while condition (optional)
+        bool fastCond = false;
+        enum CondOp
+        {
+            OP_LT,
+            OP_LE,
+            OP_GT,
+            OP_GE,
+            OP_EQ,
+            OP_NE
+        } condOp;
+        const char *condVarId = nullptr; // интернированное имя переменной из условия
+        double condCst = 0.0;            // правая константа
     };
 
     std::vector<DeepCode> deepStack; // Стек вложенности
@@ -897,7 +911,7 @@ public:
             else
             {
                 double tmp = 0.0;
-                control.getVar(idxTok, tmp); // Предполагается, что внутри есть обработка ошибок
+                control.getVar(idxTok, tmp); // внутри есть обработка ошибок
                 idx = (int)tmp;
             }
 
@@ -905,7 +919,7 @@ public:
             const double value = _fnEval(eqI + 1, endI - 1);
             control.setArrayElem(name, idx, value);
 
-            currentWord = endI;
+            currentWord = endI; // встанем на ';' — tick() сам перепрыгнет
             return;
         }
 
@@ -918,40 +932,88 @@ public:
         }
 
         // Быстрый путь: ровно 4 токена: name = value ;
-        const char *t3 = getWord(3);
-        if (t3 && t3[0] == ';' && t3[1] == '\0')
         {
-            const char *rhs = getWord(2);
-            if (!rhs)
+            const char *t3 = getWord(3);
+            if (t3 && t3[0] == ';' && t3[1] == '\0')
             {
-                printError("SET value not found\n");
-                halt();
-                return;
-            }
+                const char *rhs = getWord(2);
+                if (!rhs)
+                {
+                    printError("SET value not found\n");
+                    halt();
+                    return;
+                }
 
-            // x = число;
-            if (isNumber(rhs))
-            {
-                const double v = std::strtod(rhs, 0);
-                if (!control.setVar(name, v))
+                // x = число;
+                if (isNumber(rhs))
+                {
+                    const double v = std::strtod(rhs, 0);
+                    if (!control.setVar(name, v))
+                        printError("SET name not found", 1);
+
+                    currentWord += 4; // name '=' value ';'
+                    return;
+                }
+
+                // x = y;  (переменная справа)
+                // Это быстрее, чем вызывать общий вычислитель.
+                double tmp = 0.0;
+                control.getVar(rhs, tmp); // если переменной нет — ожидается внутренняя ошибка
+                if (!control.setVar(name, tmp))
                     printError("SET name not found", 1);
 
-                currentWord += 4; // name '=' value ';'
+                currentWord += 4;
                 return;
             }
-
-            // x = y;  (переменная справа)
-            // Это быстрее, чем вызывать общий вычислитель.
-            double tmp = 0.0;
-            control.getVar(rhs, tmp); // если переменной нет — ожидается внутренняя ошибка
-            if (!control.setVar(name, tmp))
-                printError("SET name not found", 1);
-
-            currentWord += 4;
-            return;
         }
 
-        // Общий случай: name = <выражение...> ;
+        // ---------- Супер-быстрые шаблоны без вычислителя ----------
+        // Паттерны: name = name + 1;  |  name = 1 + name;  |  name = name - 1;
+        {
+            const char *a = getWord(2);
+            const char *op = getWord(3);
+            const char *b = getWord(4);
+            const char *t5 = getWord(5);
+
+            auto isOne = [](const char *tok) noexcept
+            {
+                // дешёвая проверка числа "1" (в языке числа — только цифры)
+                return tok && tok[0] == '1' && tok[1] == '\0';
+            };
+
+            if (t5 == S->SEMI && a && op && b)
+            {
+                // name = name + 1;  или  name = 1 + name;
+                if (op == S->PLUS && ((a == name && isOne(b)) || (isOne(a) && b == name)))
+                {
+                    double cur = 0.0;
+                    if (!control.getVar(name, cur) || !control.setVar(name, cur + 1.0))
+                    {
+                        printError("SET name not found", 1);
+                        halt();
+                        return;
+                    }
+                    currentWord += 6; // name '=' a '+' b ';'
+                    return;
+                }
+
+                // name = name - 1;
+                if (op == S->MINUS && a == name && isOne(b))
+                {
+                    double cur = 0.0;
+                    if (!control.getVar(name, cur) || !control.setVar(name, cur - 1.0))
+                    {
+                        printError("SET name not found", 1);
+                        halt();
+                        return;
+                    }
+                    currentWord += 6; // name '=' name '-' '1' ';'
+                    return;
+                }
+            }
+        }
+
+        // ---------- Общий случай: name = <выражение...> ;
         const int endI = foundNextWord(S->SEMI);
         if (endI < 0)
         {
@@ -964,7 +1026,7 @@ public:
         if (!control.setVar(name, result))
             printError("SET name not found", 1);
 
-        currentWord = endI;
+        currentWord = endI; // встанем на ';' — tick() сам перепрыгнет
     }
 
     void _opIF()
@@ -1041,34 +1103,112 @@ public:
 
     void _opWHILE()
     {
+        // Находим границы "( ... ) { ... }"
         int closeParenthes = foundCloseParenthes();
         int openBrace = foundNextWord(S->LBRACE);
         int closeBrace = foundCloseBrace();
-        const char *openParenthes = getWord(1);
 
+        const char *openParenthes = getWord(1);
         if (openParenthes != S->LP)
         {
             printError("WHILE \"(\" not found", 1);
             halt();
+            return;
         }
-        double result = _fnEval(currentWord + 2, closeParenthes - 1);
-        // std::cout << "result = " << result << "\n";
-        if (result == 1 || result > 1)
-        {
-            DeepCode stack;
-            stack.INword = openBrace;
-            stack.OUTword = closeBrace;
-            stack.type = DeepType::WHILE;
-            stack.EXPRstart = currentWord + 2;
-            stack.EXPRend = closeParenthes - 1;
-            deepStack.push_back(stack);
 
+        // Готовим запись для стека вложенностей
+        DeepCode dc;
+        dc.type = DeepType::WHILE;
+        dc.INword = openBrace;
+        dc.OUTword = closeBrace;
+        dc.EXPRstart = currentWord + 2;  // содержимое условия без '('
+        dc.EXPRend = closeParenthes - 1; // и без ')'
+
+        // --- Попытка быстрого условия: ( ident < number ) ---
+        // Быстрая форма строго из трёх токенов между скобками:
+        //   tok2 = идентификатор переменной
+        //   tok3 = оператор сравнения
+        //   tok4 = целочисленная константа (строка цифр)
+        const char *tok2 = getWord(2);
+        const char *tok3 = getWord(3);
+        const char *tok4 = getWord(4);
+
+        auto isNum = [&](const char *s) -> bool
+        {
+            if (!s || !*s)
+                return false;
+            for (const unsigned char *p = (const unsigned char *)s; *p; ++p)
+                if (!std::isdigit(*p))
+                    return false;
+            return true;
+        };
+
+        dc.fastCond = false;
+        if (tok2 && tok3 && tok4 &&
+            getWord(5) == S->RP && // ровно три токена внутри ( ... )
+            isNum(tok4) &&
+            (tok3 == S->LT || tok3 == S->LEQ || tok3 == S->GT || tok3 == S->GEQ || tok3 == S->EQEQ || tok3 == S->NEQ))
+        {
+            dc.fastCond = true;
+            dc.condVarId = tok2;
+            dc.condCst = std::strtod(tok4, nullptr);
+
+            if (tok3 == S->LT)
+                dc.condOp = DeepCode::OP_LT;
+            else if (tok3 == S->LEQ)
+                dc.condOp = DeepCode::OP_LE;
+            else if (tok3 == S->GT)
+                dc.condOp = DeepCode::OP_GT;
+            else if (tok3 == S->GEQ)
+                dc.condOp = DeepCode::OP_GE;
+            else if (tok3 == S->EQEQ)
+                dc.condOp = DeepCode::OP_EQ;
+            else
+                dc.condOp = DeepCode::OP_NE;
+        }
+
+        // Функция локальной оценки условия
+        auto evalCond = [&]() -> double
+        {
+            if (!dc.fastCond)
+            {
+                return _fnEval(dc.EXPRstart, dc.EXPRend);
+            }
+            double cur = 0.0;
+            // быстрый путь всё равно читает текущее значение переменной
+            if (!control.getVar(dc.condVarId, cur))
+                return 0.0;
+
+            switch (dc.condOp)
+            {
+            case DeepCode::OP_LT:
+                return (cur < dc.condCst) ? 1.0 : 0.0;
+            case DeepCode::OP_LE:
+                return (cur <= dc.condCst) ? 1.0 : 0.0;
+            case DeepCode::OP_GT:
+                return (cur > dc.condCst) ? 1.0 : 0.0;
+            case DeepCode::OP_GE:
+                return (cur >= dc.condCst) ? 1.0 : 0.0;
+            case DeepCode::OP_EQ:
+                return (cur == dc.condCst) ? 1.0 : 0.0;
+            case DeepCode::OP_NE:
+                return (cur != dc.condCst) ? 1.0 : 0.0;
+            }
+            return 0.0;
+        };
+
+        const double result = evalCond();
+        if (result >= 1.0)
+        {
+            // Входим в тело цикла
+            deepStack.push_back(dc);
             currentWord = openBrace + 1;
             control.inLevel();
             return;
         }
-        else if (result == 0)
+        else if (result == 0.0)
         {
+            // Пропускаем тело
             currentWord = closeBrace + 1;
             return;
         }
@@ -1076,6 +1216,7 @@ public:
         {
             printError("WHILE expression not return 0/1", 1);
             halt();
+            return;
         }
     }
 
@@ -1098,11 +1239,45 @@ public:
             return;
         }
 
-        if (deepStack[deepStack.size() - 1].type == DeepType::WHILE)
+        if (deepStack.back().type == DeepType::WHILE)
         {
-            if (_fnEval(deepStack[deepStack.size() - 1].EXPRstart, deepStack[deepStack.size() - 1].EXPRend))
+            DeepCode &dc = deepStack.back();
+
+            bool ok;
+            if (dc.fastCond)
             {
-                currentWord = deepStack[deepStack.size() - 1].INword + 1;
+                double cur = 0.0;
+                control.getVar(dc.condVarId, cur);
+                switch (dc.condOp)
+                {
+                case DeepCode::OP_LT:
+                    ok = (cur < dc.condCst);
+                    break;
+                case DeepCode::OP_LE:
+                    ok = (cur <= dc.condCst);
+                    break;
+                case DeepCode::OP_GT:
+                    ok = (cur > dc.condCst);
+                    break;
+                case DeepCode::OP_GE:
+                    ok = (cur >= dc.condCst);
+                    break;
+                case DeepCode::OP_EQ:
+                    ok = (cur == dc.condCst);
+                    break;
+                case DeepCode::OP_NE:
+                    ok = (cur != dc.condCst);
+                    break;
+                }
+            }
+            else
+            {
+                ok = _fnEval(dc.EXPRstart, dc.EXPRend);
+            }
+
+            if (ok)
+            {
+                currentWord = dc.INword + 1;
                 return;
             }
             else
