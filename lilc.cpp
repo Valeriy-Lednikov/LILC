@@ -1158,15 +1158,16 @@ public:
         {
             _opPrint(1);
         }
-        else if (findPROC(word) != -1)
+        else if (getWord(1) == SYM().SEMI) //(findPROC(word) != -1)
         {
-
+            if(findPROC(word) != -1){
             DeepCode t;
             t.RETword = currentWord + 1;
             t.type = DeepType::PROC;
             deepStack.push_back(t);
             int gotoPROC = findPROC(word);
             currentWord = gotoPROC + 2; // name { ...
+            }
         }
         else if (getWord(1) == SYM().EQ || getWord(1) == SYM().LBRACKET)
         {
