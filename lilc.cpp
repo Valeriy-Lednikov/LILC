@@ -143,7 +143,7 @@ private:
                w == S->CARET || w == S->PERCENT;
     }
 
-    bool isKeyword(const char *word)
+    inline bool isKeyword(const char *word)
     {
         for (int i = 0; keywords_op[i][0] != '\0'; ++i)
         {
@@ -155,7 +155,7 @@ private:
         return false;
     }
 
-    bool isOneCharOperator(char c)
+   inline bool isOneCharOperator(char c)
     {
         for (int i = 0; oneCharOperators[i] != '\0'; ++i)
         {
@@ -167,7 +167,7 @@ private:
         return false;
     }
 
-    bool isKeywordPrefix(const char *word)
+    inline bool isKeywordPrefix(const char *word)
     {
         size_t len = strlen(word);
         for (int i = 0; keywords_op[i][0] != '\0'; ++i)
@@ -180,12 +180,23 @@ private:
         return false;
     }
 
-    inline bool isTinyKey(const char *w)
-    {
-        return TINY().find(w) != TINY().end();
+// В lilc: замени isTinyKey на это
+inline bool isTinyKey(const char* w) {
+    switch (w[0]) {
+        case 'a': return w==SYM().ABS || w==SYM().ACOS || w==SYM().ASIN || w==SYM().ATAN || w==SYM().ATAN2;
+        case 'c': return w==SYM().CEIL || w==SYM().COS || w==SYM().COSH;
+        case 'e': return w==SYM().EXP;
+        case 'f': return w==SYM().FAC || w==SYM().FLOOR;
+        case 'l': return w==SYM().LN || w==SYM().LOG || w==SYM().LOG10;
+        case 'n': return w==SYM().NCR || w==SYM().NPR;
+        case 'p': return w==SYM().PIK || w==SYM().POW;
+        case 's': return w==SYM().SIN || w==SYM().SINH || w==SYM().SQRT;
+        case 't': return w==SYM().TAN || w==SYM().TANH;
+        default:  return false;
     }
+}
 
-    bool compareChar(const char *str1, const char *str2)
+    inline bool compareChar(const char *str1, const char *str2)
     {
         char c1 = str1[0];
         int code1 = static_cast<int>(c1);
@@ -198,17 +209,16 @@ private:
         return false;
     }
 
-    bool isNumber(const char *s)
-    {
-        if (!s || *s == '\0')
-            return false; // пустая строка
-        for (const char *p = s; *p; ++p)
-        {
-            if (!std::isdigit(*p))
-                return false;
-        }
-        return true;
-    }
+inline bool isNumber(const char* s) {
+    if (!s || !*s) return false;
+    // быстрые односимвольные цифры
+    unsigned char c0 = (unsigned char)s[0];
+    if (!s[1]) return (c0 >= '0' && c0 <= '9');
+    // дальше — как было
+    for (const unsigned char* p=(const unsigned char*)s; *p; ++p)
+        if (*p < '0' || *p > '9') return false;
+    return true;
+}
 
 public:
     bool isHalted = false;
@@ -334,14 +344,14 @@ public:
         }
     }
 
-    int foundNextWord(const char *tok) const
-    {
-        for (int i = currentWord + 1; i < (int)words.size(); ++i)
-            if (words[i] == tok)
-                return i;
-        return -1;
+inline int foundNextWord(const char* tok) const {
+    const char* const* W = words.data();
+    const int n = (int)words.size();
+    for (int i = currentWord + 1; i < n; ++i) {
+        if (W[i] == tok) return i;
     }
-
+    return -1;
+}
     // int foundNextWord(const char *word) const
     // {
     //     word = INTERN().intern(word);
@@ -540,49 +550,33 @@ public:
         return expressionBuffer;
     }
 
-    int foundCloseBrace()
-    {
-        int level = 0;
-        for (int i = currentWord + 1; i < (int)words.size(); ++i)
-        {
-            if (words[i] == S->LBRACE)
-                ++level;
-            else if (words[i] == S->RBRACE)
-            {
-                --level;
-                if (level == 0)
-                    return i;
-            }
+inline int foundCloseBrace() {
+    const char* const* W = words.data();
+    const int n = (int)words.size();
+    int level = 0;
+    for (int i = currentWord + 1; i < n; ++i) {
+        const char* w = W[i];
+        if (w == SYM().LBRACE) { ++level; }
+        else if (w == SYM().RBRACE) {
+            if (--level == 0) return i;
         }
-        printError("Closing } not found\n");
-        halt();
-        return -1;
     }
+    printError("Closing } not found\n"); halt(); return -1;
+}
 
-    int foundCloseParenthes()
-    {
-        int level = 0; // мы уже внутри первой {
-        for (int i = currentWord + 1; i < (int)words.size(); ++i)
-        {
-            if (words[i] == S->LP)
-            {
-                level++;
-            }
-            else if (words[i] == S->RP)
-            {
-                level--;
-                if (level == 0)
-                {
-                    return i; // нашли нужную закрывающую скобку
-                }
-            }
+    inline int foundCloseParenthes() {
+    const char* const* W = words.data();
+    const int n = (int)words.size();
+    int level = 0;
+    for (int i = currentWord + 1; i < n; ++i) {
+        const char* w = W[i];
+        if (w == SYM().LP) { ++level; }
+        else if (w == SYM().RP) {
+            if (--level == 0) return i;
         }
-        // Если дошли сюда — не нашли
-        printError("Closing ) not found\n");
-        halt();
-
-        return -1;
     }
+    printError("Closing ) not found\n"); halt(); return -1;
+}
 
     void halt()
     {
@@ -604,10 +598,10 @@ public:
 
     void _opCreateVar()
     {
-        const char *islineEnd = getWord(2);
+        const char *islineEnd = getWordUnchecked(2);
         if (islineEnd == S->SEMI)
         {
-            const char *varName = getWord(1);
+            const char *varName = getWordUnchecked(1);
             if (!varName)
             { // Добавить условие корректности названия
                 printError("VAR name not found\n", 1);
@@ -621,10 +615,10 @@ public:
             return;
         }
 
-        const char *varName = getWord(1);
-        const char *openSquare = getWord(2);
-        const char *closeSquare = getWord(4);
-        const char *lineEnd = getWord(5);
+        const char *varName = getWordUnchecked(1);
+        const char *openSquare = getWordUnchecked(2);
+        const char *closeSquare = getWordUnchecked(4);
+        const char *lineEnd = getWordUnchecked(5);
         if (!varName)
         { // Добавить условие корректности названия
             printError("VAR name not found\n", 1);
@@ -636,16 +630,16 @@ public:
             {
                 if (lineEnd == S->SEMI)
                 {
-                    control.addArray(varName, std::stoi(getWord(3)));
+                    control.addArray(varName, std::stoi(getWordUnchecked(3)));
                     currentWord += 5;
                     return;
                 }
             }
         }
 
-        const char *varSet = getWord(2);
-        const char *valueStr = getWord(3);
-        const char *lineEnd2 = getWord(4);
+        const char *varSet = getWordUnchecked(2);
+        const char *valueStr = getWordUnchecked(3);
+        const char *lineEnd2 = getWordUnchecked(4);
         if (!varName)
         { // Добавить условие корректности названия
             printError("VAR name not found\n", 1);
@@ -676,12 +670,12 @@ public:
 
     void _opPrint(bool ln = 0)
     {
-        const char *isTextOpen = getWord(1);
+        const char *isTextOpen = getWordUnchecked(1);
         if (isTextOpen == S->QUOTE)
         {
-            const char *text = getWord(2);
-            const char *isTextClose = getWord(3);
-            const char *lineEnd = getWord(4);
+            const char *text = getWordUnchecked(2);
+            const char *isTextClose = getWordUnchecked(3);
+            const char *lineEnd = getWordUnchecked(4);
             if (!isTextClose || isTextClose != S->QUOTE)
             {
                 printError("PRINT TEXT \" CLOSE not found", 3);
@@ -716,10 +710,10 @@ public:
 
         double value;
 
-        bool isArray = (getWord(2) == S->LBRACKET) && (getWord(4) == S->RBRACKET);
+        bool isArray = (getWordUnchecked(2) == S->LBRACKET) && (getWordUnchecked(4) == S->RBRACKET);
 
-        const char *varName = getWord(1);
-        const char *lineEnd = getWord(2);
+        const char *varName = getWordUnchecked(1);
+        const char *lineEnd = getWordUnchecked(2);
         if (!varName)
         { // Добавить условие корректности названия
             printError("PRINT VAR name not found", 1);
@@ -743,13 +737,13 @@ public:
         {
 
             double index = -1;
-            if (isNumber(getWord(3)))
+            if (isNumber(getWordUnchecked(3)))
             {
-                index = std::stoi(getWord(3));
+                index = std::stoi(getWordUnchecked(3));
             }
             else
             {
-                control.getVar(getWord(3), index);
+                control.getVar(getWordUnchecked(3), index);
             }
 
             if (!control.getArrayElem(varName, int(index), value))
@@ -1039,7 +1033,7 @@ public:
         int closeParenthes = foundCloseParenthes();
         int openBrace = foundNextWord(S->LBRACE);
         int closeBrace = foundCloseBrace();
-        const char *openParenthes = getWord(1);
+        const char *openParenthes = getWordUnchecked(1);
 
         // std::cout << "close Parenthes " << closeParenthes << " openBrace " << openBrace << " closeBrace " << closeBrace << "\n";
 
@@ -1083,7 +1077,7 @@ public:
 
     void _opELSE()
     {
-        const char *openBrace = getWord(1);
+        const char *openBrace = getWordUnchecked(1);
         if (openBrace != S->LBRACE)
         {
             printError("ELSE \"{\" not found", 1);
@@ -1340,7 +1334,7 @@ public:
         {
             _opPrint(1);
         }
-        else if (getWord(1) == S->SEMI) //(findPROC(word) != -1)
+        else if (getWordUnchecked(1) == S->SEMI) //(findPROC(word) != -1)
         {
             if (findPROC(word) != -1)
             {
@@ -1352,7 +1346,7 @@ public:
                 currentWord = gotoPROC + 2; // name { ...
             }
         }
-        else if (getWord(1) == S->EQ || getWord(1) == S->LBRACKET)
+        else if (getWordUnchecked(1) == S->EQ || getWordUnchecked(1) == S->LBRACKET)
         {
             _opSet(); // внутри уже разберём, и если имя не найдено — выведем ошибку
         }

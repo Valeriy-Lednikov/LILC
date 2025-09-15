@@ -103,6 +103,14 @@ struct Symbols
        EQEQ = nullptr, NEQ = nullptr, LEQ = nullptr, GEQ = nullptr,
        LT = nullptr, GT = nullptr, COMMA = nullptr, QUOTE = nullptr, NOT = nullptr, CARET = nullptr, PERCENT = nullptr;
 
+    Id  ABS=nullptr, ACOS=nullptr, ASIN=nullptr, ATAN=nullptr, ATAN2=nullptr,
+            CEIL=nullptr, COS=nullptr, COSH=nullptr, EXP=nullptr, FAC=nullptr,
+            FLOOR=nullptr, LN=nullptr, LOG=nullptr, LOG10=nullptr, NCR=nullptr, NPR=nullptr,
+            PIK=nullptr, /*  'pi' назови PIK чтобы не путать с полем PERCENT  */
+            POW=nullptr, SIN=nullptr, SINH=nullptr, SQRT=nullptr, TAN=nullptr, TANH=nullptr;
+
+
+
     void init(Interner &I)
     {
         // ключевые слова
@@ -144,12 +152,22 @@ struct Symbols
         CARET = I.intern("^");
         PERCENT = I.intern("%");
 
-        const char *tiny_names[] = {
-            "abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "cosh", "exp", "fac",
-            "floor", "ln", "log", "log10", "ncr", "npr", "pi", "pow", "sin", "sinh", "sqrt",
-            "tan", "tanh", nullptr};
-        for (const char **p = tiny_names; *p; ++p)
-            TINY().insert(I.intern(*p));
+
+        ABS=I.intern("abs");   ACOS=I.intern("acos");  ASIN=I.intern("asin");
+ATAN=I.intern("atan"); ATAN2=I.intern("atan2");
+CEIL=I.intern("ceil"); COS=I.intern("cos");   COSH=I.intern("cosh");
+EXP=I.intern("exp");   FAC=I.intern("fac");   FLOOR=I.intern("floor");
+LN=I.intern("ln");     LOG=I.intern("log");   LOG10=I.intern("log10");
+NCR=I.intern("ncr");   NPR=I.intern("npr");   PIK=I.intern("pi");
+POW=I.intern("pow");   SIN=I.intern("sin");   SINH=I.intern("sinh");
+SQRT=I.intern("sqrt"); TAN=I.intern("tan");   TANH=I.intern("tanh");
+
+        // const char *tiny_names[] = {
+        //     "abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "cosh", "exp", "fac",
+        //     "floor", "ln", "log", "log10", "ncr", "npr", "pi", "pow", "sin", "sinh", "sqrt",
+        //     "tan", "tanh", nullptr};
+        // for (const char **p = tiny_names; *p; ++p)
+        //     TINY().insert(I.intern(*p));
     }
 };
 
