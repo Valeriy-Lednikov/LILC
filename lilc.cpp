@@ -291,7 +291,7 @@ public:
         control = controller(); // создаём новый контроллер
     }
 
-    const char *getWord(int i) const
+    inline const char *getWord(int i) const
     {
         int index = currentWord + i;
         if (index >= 0 && index < static_cast<int>(words.size()))
@@ -302,6 +302,11 @@ public:
         {
             return nullptr;
         }
+    }
+
+    inline const char *getWordUnchecked(int k) const noexcept
+    {
+        return words[currentWord + k];
     }
 
     const char *getWordGlob(int i)
@@ -863,7 +868,7 @@ public:
     void _opSet()
     {
         // Имя переменной обязательно
-        const char *name = getWord(0);
+        const char *name = getWordUnchecked(0);
         if (!name)
         {
             printError("SET name not found\n");
@@ -872,7 +877,7 @@ public:
         }
 
         // Второй токен: либо '[' (массив), либо '=' (скаляр)
-        const char *t1 = getWord(1);
+        const char *t1 = getWordUnchecked(1);
         if (!t1)
         {
             printError("SET syntax error: missing token after name\n");
@@ -883,8 +888,8 @@ public:
         // ---------- Ветка: присваивание элементу массива: name [ index ] = expr ;
         if (t1[0] == '[' && t1[1] == '\0')
         {
-            const char *idxTok = getWord(2);
-            const char *t3 = getWord(3); // ожидаем ']'
+            const char *idxTok = getWordUnchecked(2);
+            const char *t3 = getWordUnchecked(3); // ожидаем ']'
             if (!idxTok || !t3 || !(t3[0] == ']' && t3[1] == '\0'))
             {
                 printError("SET array syntax error: missing ']' or index\n");
@@ -933,10 +938,10 @@ public:
 
         // Быстрый путь: ровно 4 токена: name = value ;
         {
-            const char *t3 = getWord(3);
+            const char *t3 = getWordUnchecked(3);
             if (t3 && t3[0] == ';' && t3[1] == '\0')
             {
-                const char *rhs = getWord(2);
+                const char *rhs = getWordUnchecked(2);
                 if (!rhs)
                 {
                     printError("SET value not found\n");
@@ -970,10 +975,10 @@ public:
         // ---------- Супер-быстрые шаблоны без вычислителя ----------
         // Паттерны: name = name + 1;  |  name = 1 + name;  |  name = name - 1;
         {
-            const char *a = getWord(2);
-            const char *op = getWord(3);
-            const char *b = getWord(4);
-            const char *t5 = getWord(5);
+            const char *a = getWordUnchecked(2);
+            const char *op = getWordUnchecked(3);
+            const char *b = getWordUnchecked(4);
+            const char *t5 = getWordUnchecked(5);
 
             auto isOne = [](const char *tok) noexcept
             {
@@ -1108,7 +1113,7 @@ public:
         int openBrace = foundNextWord(S->LBRACE);
         int closeBrace = foundCloseBrace();
 
-        const char *openParenthes = getWord(1);
+        const char *openParenthes = getWordUnchecked(1);
         if (openParenthes != S->LP)
         {
             printError("WHILE \"(\" not found", 1);
@@ -1129,9 +1134,9 @@ public:
         //   tok2 = идентификатор переменной
         //   tok3 = оператор сравнения
         //   tok4 = целочисленная константа (строка цифр)
-        const char *tok2 = getWord(2);
-        const char *tok3 = getWord(3);
-        const char *tok4 = getWord(4);
+        const char *tok2 = getWordUnchecked(2);
+        const char *tok3 = getWordUnchecked(3);
+        const char *tok4 = getWordUnchecked(4);
 
         auto isNum = [&](const char *s) -> bool
         {
@@ -1145,7 +1150,7 @@ public:
 
         dc.fastCond = false;
         if (tok2 && tok3 && tok4 &&
-            getWord(5) == S->RP && // ровно три токена внутри ( ... )
+            getWordUnchecked(5) == S->RP && // ровно три токена внутри ( ... )
             isNum(tok4) &&
             (tok3 == S->LT || tok3 == S->LEQ || tok3 == S->GT || tok3 == S->GEQ || tok3 == S->EQEQ || tok3 == S->NEQ))
         {
@@ -1290,7 +1295,7 @@ public:
 
         if (deepStack[deepStack.size() - 1].type == DeepType::IF)
         {
-            const char *word = getWord(1);
+            const char *word = getWordUnchecked(1);
             // std::cout << "is else " << word << "\n";
             if (word == S->ELSE)
             {
