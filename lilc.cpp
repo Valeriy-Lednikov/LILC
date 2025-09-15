@@ -90,6 +90,7 @@ const static char *keywords_op[] = {
 class lilc
 {
 private:
+    const Symbols *S = nullptr;
     char *program = nullptr;
     char *expressionBuffer = nullptr; // Буфер для результата выражения
 
@@ -121,11 +122,11 @@ private:
 
     inline bool isExprToken(const char *w)
     {
-        return w == SYM().PLUS || w == SYM().MINUS || w == SYM().STAR || w == SYM().SLASH ||
-               w == SYM().LP || w == SYM().RP || w == SYM().COMMA ||
-               w == SYM().EQEQ || w == SYM().NEQ || w == SYM().LEQ || w == SYM().GEQ ||
-               w == SYM().LT || w == SYM().GT ||
-               w == SYM().CARET || w == SYM().PERCENT;
+        return w == S->PLUS || w == S->MINUS || w == S->STAR || w == S->SLASH ||
+               w == S->LP || w == S->RP || w == S->COMMA ||
+               w == S->EQEQ || w == S->NEQ || w == S->LEQ || w == S->GEQ ||
+               w == S->LT || w == S->GT ||
+               w == S->CARET || w == S->PERCENT;
     }
 
     bool isKeyword(const char *word)
@@ -261,6 +262,7 @@ public:
             SYM().init(INTERN());
             syms_inited = true;
         }
+        S = &SYM();
         if (program)
             delete[] program;
 
@@ -364,7 +366,7 @@ public:
     {
         for (int i = 1; i < (int)words.size(); ++i)
         {
-            if (words[i] == name && words[i - 1] == SYM().PROC)
+            if (words[i] == name && words[i - 1] == S->PROC)
                 return i;
         }
 
@@ -423,7 +425,7 @@ public:
                 ptr += len;
             }
             // 5) Обращение к массиву:  name [ index ]
-            else if (i + 3 <= endWord && words[i + 1] == SYM().LBRACKET && words[i + 3] == SYM().RBRACKET)
+            else if (i + 3 <= endWord && words[i + 1] == S->LBRACKET && words[i + 3] == S->RBRACKET)
             {
                 const char *arrName = word;
                 const char *idxTok = words[i + 2];
@@ -524,9 +526,9 @@ public:
         int level = 0;
         for (int i = currentWord + 1; i < (int)words.size(); ++i)
         {
-            if (words[i] == SYM().LBRACE)
+            if (words[i] == S->LBRACE)
                 ++level;
-            else if (words[i] == SYM().RBRACE)
+            else if (words[i] == S->RBRACE)
             {
                 --level;
                 if (level == 0)
@@ -543,11 +545,11 @@ public:
         int level = 0; // мы уже внутри первой {
         for (int i = currentWord + 1; i < (int)words.size(); ++i)
         {
-            if (words[i] == SYM().LP)
+            if (words[i] == S->LP)
             {
                 level++;
             }
-            else if (words[i] == SYM().RP)
+            else if (words[i] == S->RP)
             {
                 level--;
                 if (level == 0)
@@ -570,13 +572,13 @@ public:
 
     void _opCONTINUE()
     {
-        int closeBrace = foundNextWord(SYM().RBRACE);
+        int closeBrace = foundNextWord(S->RBRACE);
         currentWord = closeBrace;
     }
 
     void _opBREAK()
     {
-        int closeBrace = foundNextWord(SYM().RBRACE);
+        int closeBrace = foundNextWord(S->RBRACE);
         currentWord = closeBrace + 1;
         control.outLevel();
     }
@@ -584,7 +586,7 @@ public:
     void _opCreateVar()
     {
         const char *islineEnd = getWord(2);
-        if (islineEnd == SYM().SEMI)
+        if (islineEnd == S->SEMI)
         {
             const char *varName = getWord(1);
             if (!varName)
@@ -609,11 +611,11 @@ public:
             printError("VAR name not found\n", 1);
             halt();
         }
-        if (openSquare == SYM().LBRACKET)
+        if (openSquare == S->LBRACKET)
         {
-            if (closeSquare == SYM().RBRACKET)
+            if (closeSquare == S->RBRACKET)
             {
-                if (lineEnd == SYM().SEMI)
+                if (lineEnd == S->SEMI)
                 {
                     control.addArray(varName, std::stoi(getWord(3)));
                     currentWord += 5;
@@ -640,7 +642,7 @@ public:
             printError("VAR value not found\n");
             halt();
         }
-        if (!lineEnd2 || lineEnd2 != SYM().SEMI)
+        if (!lineEnd2 || lineEnd2 != S->SEMI)
         {
             printError("VAR \";\" not found\n", 4);
             halt();
@@ -656,17 +658,17 @@ public:
     void _opPrint(bool ln = 0)
     {
         const char *isTextOpen = getWord(1);
-        if (isTextOpen == SYM().QUOTE)
+        if (isTextOpen == S->QUOTE)
         {
             const char *text = getWord(2);
             const char *isTextClose = getWord(3);
             const char *lineEnd = getWord(4);
-            if (!isTextClose || isTextClose != SYM().QUOTE)
+            if (!isTextClose || isTextClose != S->QUOTE)
             {
                 printError("PRINT TEXT \" CLOSE not found", 3);
                 halt();
             }
-            if (!lineEnd || lineEnd != SYM().SEMI)
+            if (!lineEnd || lineEnd != S->SEMI)
             {
                 printError("PRINT TEXT\";\" not found", 4);
                 halt();
@@ -695,7 +697,7 @@ public:
 
         double value;
 
-        bool isArray = (getWord(2) == SYM().LBRACKET) && (getWord(4) == SYM().RBRACKET);
+        bool isArray = (getWord(2) == S->LBRACKET) && (getWord(4) == S->RBRACKET);
 
         const char *varName = getWord(1);
         const char *lineEnd = getWord(2);
@@ -877,8 +879,8 @@ public:
             }
 
             // Ищем '=' и ';' один раз
-            const int eqI = foundNextWord(SYM().EQ);
-            const int endI = foundNextWord(SYM().SEMI);
+            const int eqI = foundNextWord(S->EQ);
+            const int endI = foundNextWord(S->SEMI);
             if (eqI < 0 || endI < 0 || eqI >= endI)
             {
                 printError("SET array syntax error: '=' or ';' not found\n");
@@ -950,7 +952,7 @@ public:
         }
 
         // Общий случай: name = <выражение...> ;
-        const int endI = foundNextWord(SYM().SEMI);
+        const int endI = foundNextWord(S->SEMI);
         if (endI < 0)
         {
             printError("SET ';' not found\n");
@@ -968,13 +970,13 @@ public:
     void _opIF()
     {
         int closeParenthes = foundCloseParenthes();
-        int openBrace = foundNextWord(SYM().LBRACE);
+        int openBrace = foundNextWord(S->LBRACE);
         int closeBrace = foundCloseBrace();
         const char *openParenthes = getWord(1);
 
         // std::cout << "close Parenthes " << closeParenthes << " openBrace " << openBrace << " closeBrace " << closeBrace << "\n";
 
-        if (openParenthes != SYM().LP)
+        if (openParenthes != S->LP)
         {
             printError("IF \"(\" not found", 1);
             halt();
@@ -1015,7 +1017,7 @@ public:
     void _opELSE()
     {
         const char *openBrace = getWord(1);
-        if (openBrace != SYM().LBRACE)
+        if (openBrace != S->LBRACE)
         {
             printError("ELSE \"{\" not found", 1);
             halt();
@@ -1040,11 +1042,11 @@ public:
     void _opWHILE()
     {
         int closeParenthes = foundCloseParenthes();
-        int openBrace = foundNextWord(SYM().LBRACE);
+        int openBrace = foundNextWord(S->LBRACE);
         int closeBrace = foundCloseBrace();
         const char *openParenthes = getWord(1);
 
-        if (openParenthes != SYM().LP)
+        if (openParenthes != S->LP)
         {
             printError("WHILE \"(\" not found", 1);
             halt();
@@ -1115,7 +1117,7 @@ public:
         {
             const char *word = getWord(1);
             // std::cout << "is else " << word << "\n";
-            if (word == SYM().ELSE)
+            if (word == S->ELSE)
             {
                 // std::cout << "IF ok, next ELSE\n";
                 int closeELSE = foundCloseBrace();
@@ -1146,62 +1148,63 @@ public:
         }
 
         // обработка команд
-        if (word == SYM().VAR)
+        if (word == S->VAR)
         {
             _opCreateVar();
         }
-        else if (word == SYM().PRINT)
+        else if (word == S->PRINT)
         {
             _opPrint();
         }
-        else if (word == SYM().PRINTLN)
+        else if (word == S->PRINTLN)
         {
             _opPrint(1);
         }
-        else if (getWord(1) == SYM().SEMI) //(findPROC(word) != -1)
+        else if (getWord(1) == S->SEMI) //(findPROC(word) != -1)
         {
-            if(findPROC(word) != -1){
-            DeepCode t;
-            t.RETword = currentWord + 1;
-            t.type = DeepType::PROC;
-            deepStack.push_back(t);
-            int gotoPROC = findPROC(word);
-            currentWord = gotoPROC + 2; // name { ...
+            if (findPROC(word) != -1)
+            {
+                DeepCode t;
+                t.RETword = currentWord + 1;
+                t.type = DeepType::PROC;
+                deepStack.push_back(t);
+                int gotoPROC = findPROC(word);
+                currentWord = gotoPROC + 2; // name { ...
             }
         }
-        else if (getWord(1) == SYM().EQ || getWord(1) == SYM().LBRACKET)
+        else if (getWord(1) == S->EQ || getWord(1) == S->LBRACKET)
         {
             _opSet(); // внутри уже разберём, и если имя не найдено — выведем ошибку
         }
-        else if (word == SYM().IF)
+        else if (word == S->IF)
         {
             _opIF();
         }
-        else if (word == SYM().WHILE)
+        else if (word == S->WHILE)
         {
             _opWHILE();
         }
-        else if (word == SYM().RBRACE)
+        else if (word == S->RBRACE)
         {
             _opCLOSEBRACE();
         }
-        else if (word == SYM().ELSE)
+        else if (word == S->ELSE)
         {
             _opELSE();
         }
-        else if (word == SYM().SEMI)
+        else if (word == S->SEMI)
         {
             nextWord();
         }
-        else if (word == SYM().HALT)
+        else if (word == S->HALT)
         {
             halt();
         }
-        else if (word == SYM().PROC)
+        else if (word == S->PROC)
         {
             _opPROC();
         }
-        else if (word == SYM().RETURN)
+        else if (word == S->RETURN)
         {
             _opRETURN();
         }
@@ -1274,7 +1277,7 @@ private:
                 flushBuffer();
 
                 // 2) Открывающая кавычка как отдельный токен
-                words.push_back(SYM().QUOTE);
+                words.push_back(S->QUOTE);
                 ++program;
 
                 // 3) Собираем содержимое строки с поддержкой любого экранирования
@@ -1310,7 +1313,7 @@ private:
                 // 5) Закрывающая кавычка как отдельный токен
                 if (*program == '"')
                 {
-                    words.push_back(SYM().QUOTE);
+                    words.push_back(S->QUOTE);
                     ++program;
                 }
             }
@@ -1343,9 +1346,9 @@ private:
         // пост проход. Убираем !, = в !=
         for (size_t i = 0; i + 1 < words.size();)
         {
-            if (words[i] == SYM().NOT && words[i + 1] == SYM().EQ)
+            if (words[i] == S->NOT && words[i + 1] == S->EQ)
             {
-                words[i] = SYM().NEQ;
+                words[i] = S->NEQ;
                 words.erase(words.begin() + (i + 1));
             }
             else
