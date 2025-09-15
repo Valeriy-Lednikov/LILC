@@ -93,7 +93,7 @@ private:
     char *program = nullptr;
     char *expressionBuffer = nullptr; // Буфер для результата выражения
 
-    std::vector<char *> words;
+    std::vector<const char *> words;
     int currentWord = 0;
 
     controller control; // экземпляр контроллера для переменных
@@ -119,6 +119,15 @@ private:
 
     std::vector<DeepCode> deepStack; // Стек вложенности
 
+    inline bool isExprToken(const char *w)
+    {
+        return w == SYM().PLUS || w == SYM().MINUS || w == SYM().STAR || w == SYM().SLASH ||
+               w == SYM().LP || w == SYM().RP || w == SYM().COMMA ||
+               w == SYM().EQEQ || w == SYM().NEQ || w == SYM().LEQ || w == SYM().GEQ ||
+               w == SYM().LT || w == SYM().GT ||
+               w == SYM().CARET || w == SYM().PERCENT;
+    }
+
     bool isKeyword(const char *word)
     {
         for (int i = 0; keywords_op[i][0] != '\0'; ++i)
@@ -143,18 +152,6 @@ private:
         return false;
     }
 
-    bool isKeywordFull(const char *word)
-    {
-        for (int i = 0; keywords_op[i][0] != '\0'; ++i)
-        {
-            if (strcmp(word, keywords_op[i]) == 0)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
     bool isKeywordPrefix(const char *word)
     {
         size_t len = strlen(word);
@@ -168,15 +165,9 @@ private:
         return false;
     }
 
-    bool isTinyKey(const char *word)
+    inline bool isTinyKey(const char *w)
     {
-        // tiny_key объявлен где-то в том же файле или во внешней области видимости
-        for (int i = 0; tiny_key[i][0] != '\0'; ++i)
-        {
-            if (std::strcmp(word, tiny_key[i]) == 0)
-                return true;
-        }
-        return false;
+        return TINY().find(w) != TINY().end();
     }
 
     bool compareChar(const char *str1, const char *str2)
@@ -264,12 +255,15 @@ public:
 
     void loadProgram(const char *prog)
     {
+        static bool syms_inited = false;
+        if (!syms_inited)
+        {
+            SYM().init(INTERN());
+            syms_inited = true;
+        }
         if (program)
             delete[] program;
-        for (auto word : words)
-        {
-            delete[] word;
-        }
+
         words.clear();
 
         program = new char[strlen(prog) + 1];
@@ -319,23 +313,33 @@ public:
         }
     }
 
-    int foundNextWord(const char *word) const
+    int foundNextWord(const char *tok) const
     {
-        for (int i = currentWord + 1; i < static_cast<int>(words.size()); ++i)
-        {
-            if (std::strcmp(words[i], word) == 0)
-            {
+        for (int i = currentWord + 1; i < (int)words.size(); ++i)
+            if (words[i] == tok)
                 return i;
-            }
-        }
         return -1;
     }
 
+    // int foundNextWord(const char *word) const
+    // {
+    //     word = INTERN().intern(word);
+    //     for (int i = currentWord + 1; i < static_cast<int>(words.size()); ++i)
+    //     {
+    //         if (words[i] == word)
+    //         {
+    //             return i;
+    //         }
+    //     }
+    //     return -1;
+    // }
+
     int foundPrevWord(const char *word) const
     {
+        word = INTERN().intern(word);
         for (int i = currentWord - 1; i >= 0; --i)
         {
-            if (std::strcmp(words[i], word) == 0)
+            if (words[i] == word)
             {
                 return i;
             }
@@ -358,17 +362,10 @@ public:
 
     int findPROC(const char *name)
     {
-        for (int i = 0; i < words.size(); i++)
+        for (int i = 1; i < (int)words.size(); ++i)
         {
-            if (std::strcmp(words[i], name) == 0)
-            {
-
-                if (std::strcmp(words[i - 1], "PROC") == 0)
-                {
-                    // std::cout << "FIND PROC ON " << i << "\n";
-                    return i;
-                }
-            }
+            if (words[i] == name && words[i - 1] == SYM().PROC)
+                return i;
         }
 
         return -1;
@@ -409,7 +406,7 @@ public:
                 ptr += len;
             }
             // 2) Ключевые слова языка
-            else if (isKeyword(word))
+            else if (isExprToken(word))
             {
                 std::memcpy(ptr, word, len);
                 ptr += len;
@@ -426,7 +423,7 @@ public:
                 ptr += len;
             }
             // 5) Обращение к массиву:  name [ index ]
-            else if (i + 3 <= endWord && std::strcmp(words[i + 1], "[") == 0 && std::strcmp(words[i + 3], "]") == 0)
+            else if (i + 3 <= endWord && words[i + 1] == SYM().LBRACKET && words[i + 3] == SYM().RBRACKET)
             {
                 const char *arrName = word;
                 const char *idxTok = words[i + 2];
@@ -525,28 +522,20 @@ public:
     int foundCloseBrace()
     {
         int level = 0;
+        for (int i = currentWord + 1; i < (int)words.size(); ++i)
         {
-            for (int i = currentWord + 1; i < (int)words.size(); ++i)
+            if (words[i] == SYM().LBRACE)
+                ++level;
+            else if (words[i] == SYM().RBRACE)
             {
-                if (std::strcmp(words[i], "{") == 0)
-                {
-                    level++;
-                }
-                else if (std::strcmp(words[i], "}") == 0)
-                {
-                    level--;
-                    if (level == 0)
-                    {
-                        return i; // нашли нужную закрывающую скобку
-                    }
-                }
+                --level;
+                if (level == 0)
+                    return i;
             }
-            // Если дошли сюда — не нашли
-            printError("Closing } not found\n");
-            halt();
-
-            return -1;
         }
+        printError("Closing } not found\n");
+        halt();
+        return -1;
     }
 
     int foundCloseParenthes()
@@ -554,11 +543,11 @@ public:
         int level = 0; // мы уже внутри первой {
         for (int i = currentWord + 1; i < (int)words.size(); ++i)
         {
-            if (std::strcmp(words[i], "(") == 0)
+            if (words[i] == SYM().LP)
             {
                 level++;
             }
-            else if (std::strcmp(words[i], ")") == 0)
+            else if (words[i] == SYM().RP)
             {
                 level--;
                 if (level == 0)
@@ -581,13 +570,13 @@ public:
 
     void _opCONTINUE()
     {
-        int closeBrace = foundNextWord("}");
+        int closeBrace = foundNextWord(SYM().RBRACE);
         currentWord = closeBrace;
     }
 
     void _opBREAK()
     {
-        int closeBrace = foundNextWord("}");
+        int closeBrace = foundNextWord(SYM().RBRACE);
         currentWord = closeBrace + 1;
         control.outLevel();
     }
@@ -595,7 +584,7 @@ public:
     void _opCreateVar()
     {
         const char *islineEnd = getWord(2);
-        if (std::strcmp(islineEnd, ";") == 0)
+        if (islineEnd == SYM().SEMI)
         {
             const char *varName = getWord(1);
             if (!varName)
@@ -620,11 +609,11 @@ public:
             printError("VAR name not found\n", 1);
             halt();
         }
-        if (std::strcmp(openSquare, "[") == 0)
+        if (openSquare == SYM().LBRACKET)
         {
-            if (std::strcmp(closeSquare, "]") == 0)
+            if (closeSquare == SYM().RBRACKET)
             {
-                if (std::strcmp(lineEnd, ";") == 0)
+                if (lineEnd == SYM().SEMI)
                 {
                     control.addArray(varName, std::stoi(getWord(3)));
                     currentWord += 5;
@@ -651,7 +640,7 @@ public:
             printError("VAR value not found\n");
             halt();
         }
-        if (!lineEnd2 || std::strcmp(lineEnd2, ";") != 0)
+        if (!lineEnd2 || lineEnd2 != SYM().SEMI)
         {
             printError("VAR \";\" not found\n", 4);
             halt();
@@ -667,17 +656,17 @@ public:
     void _opPrint(bool ln = 0)
     {
         const char *isTextOpen = getWord(1);
-        if (std::strcmp(isTextOpen, "\"") == 0)
+        if (isTextOpen == SYM().QUOTE)
         {
             const char *text = getWord(2);
             const char *isTextClose = getWord(3);
             const char *lineEnd = getWord(4);
-            if (!isTextClose || std::strcmp(isTextClose, "\"") != 0)
+            if (!isTextClose || isTextClose != SYM().QUOTE)
             {
                 printError("PRINT TEXT \" CLOSE not found", 3);
                 halt();
             }
-            if (!lineEnd || std::strcmp(lineEnd, ";") != 0)
+            if (!lineEnd || lineEnd != SYM().SEMI)
             {
                 printError("PRINT TEXT\";\" not found", 4);
                 halt();
@@ -706,15 +695,7 @@ public:
 
         double value;
 
-        bool isArray = false;
-
-        if (compareChar(getWord(2), "["))
-        {
-            if (compareChar(getWord(4), "]"))
-            {
-                isArray = true;
-            }
-        }
+        bool isArray = (getWord(2) == SYM().LBRACKET) && (getWord(4) == SYM().RBRACKET);
 
         const char *varName = getWord(1);
         const char *lineEnd = getWord(2);
@@ -723,7 +704,7 @@ public:
             printError("PRINT VAR name not found", 1);
             halt();
         }
-        // if ((!lineEnd || std::strcmp(lineEnd, ";") != 0) && index == -1)
+        // if ((!lineEnd || std::strcmp1(lineEnd, ";") != 0) && index == -1)
         // {
         //     printError("PRINT VAR \";\" not found", 2);
         //     halt();
@@ -797,6 +778,7 @@ public:
         const char *ops[] = {"!=", "==", ">=", "<=", ">", "<"};
         const char *foundOp = nullptr;
         int foundOpLen = 0;
+        int opIndex = -1;
         const char *p = expr; // <<< Вынесли p сюда!
 
         for (; *p; ++p)
@@ -808,6 +790,7 @@ public:
                 {
                     foundOp = ops[i];
                     foundOpLen = len;
+                    opIndex = i; // <— запомнили какой именно оператор нашли
                     goto operator_found;
                 }
             }
@@ -817,8 +800,7 @@ public:
 
         if (foundOp)
         {
-            int pos = p - expr; // ← теперь p доступна тут!
-
+            int pos = int(p - expr);
             int exprLen = std::strlen(expr);
 
             // Левое выражение
@@ -841,29 +823,20 @@ public:
             delete[] exprRight;
 
             // Сравнение
-            if (std::strcmp(foundOp, "==") == 0)
+            switch (opIndex)
             {
-                return leftVal == rightVal;
-            }
-            else if (std::strcmp(foundOp, "!=") == 0)
-            {
-                return leftVal != rightVal;
-            }
-            else if (std::strcmp(foundOp, ">") == 0)
-            {
-                return leftVal > rightVal;
-            }
-            else if (std::strcmp(foundOp, "<") == 0)
-            {
-                return leftVal < rightVal;
-            }
-            else if (std::strcmp(foundOp, ">=") == 0)
-            {
-                return leftVal >= rightVal;
-            }
-            else if (std::strcmp(foundOp, "<=") == 0)
-            {
-                return leftVal <= rightVal;
+            case 1:
+                return leftVal == rightVal; // "=="
+            case 0:
+                return leftVal != rightVal; // "!="
+            case 4:
+                return leftVal > rightVal; // ">"
+            case 5:
+                return leftVal < rightVal; // "<"
+            case 2:
+                return leftVal >= rightVal; // ">="
+            case 3:
+                return leftVal <= rightVal; // "<="
             }
         }
 
@@ -871,138 +844,137 @@ public:
         return te_interp(expr, 0);
     }
 
-void _opSet()
-{
-    // Имя переменной обязательно
-    const char *name = getWord(0);
-    if (!name)
+    void _opSet()
     {
-        printError("SET name not found\n");
-        halt();
-        return;
-    }
-
-    // Второй токен: либо '[' (массив), либо '=' (скаляр)
-    const char *t1 = getWord(1);
-    if (!t1)
-    {
-        printError("SET syntax error: missing token after name\n");
-        halt();
-        return;
-    }
-
-    // ---------- Ветка: присваивание элементу массива: name [ index ] = expr ;
-    if (t1[0] == '[' && t1[1] == '\0')
-    {
-        const char *idxTok = getWord(2);
-        const char *t3     = getWord(3); // ожидаем ']'
-        if (!idxTok || !t3 || !(t3[0] == ']' && t3[1] == '\0'))
+        // Имя переменной обязательно
+        const char *name = getWord(0);
+        if (!name)
         {
-            printError("SET array syntax error: missing ']' or index\n");
+            printError("SET name not found\n");
             halt();
             return;
         }
 
-        // Ищем '=' и ';' один раз
-        const int eqI  = foundNextWord("=");
-        const int endI = foundNextWord(";");
-        if (eqI < 0 || endI < 0 || eqI >= endI)
+        // Второй токен: либо '[' (массив), либо '=' (скаляр)
+        const char *t1 = getWord(1);
+        if (!t1)
         {
-            printError("SET array syntax error: '=' or ';' not found\n");
+            printError("SET syntax error: missing token after name\n");
             halt();
             return;
         }
 
-        // Индекс: число или имя переменной
-        int idx;
-        if (isNumber(idxTok))
+        // ---------- Ветка: присваивание элементу массива: name [ index ] = expr ;
+        if (t1[0] == '[' && t1[1] == '\0')
         {
-            idx = (int)std::strtol(idxTok, 0, 10);
+            const char *idxTok = getWord(2);
+            const char *t3 = getWord(3); // ожидаем ']'
+            if (!idxTok || !t3 || !(t3[0] == ']' && t3[1] == '\0'))
+            {
+                printError("SET array syntax error: missing ']' or index\n");
+                halt();
+                return;
+            }
+
+            // Ищем '=' и ';' один раз
+            const int eqI = foundNextWord(SYM().EQ);
+            const int endI = foundNextWord(SYM().SEMI);
+            if (eqI < 0 || endI < 0 || eqI >= endI)
+            {
+                printError("SET array syntax error: '=' or ';' not found\n");
+                halt();
+                return;
+            }
+
+            // Индекс: число или имя переменной
+            int idx;
+            if (isNumber(idxTok))
+            {
+                idx = (int)std::strtol(idxTok, 0, 10);
+            }
+            else
+            {
+                double tmp = 0.0;
+                control.getVar(idxTok, tmp); // Предполагается, что внутри есть обработка ошибок
+                idx = (int)tmp;
+            }
+
+            // Вычисляем выражение справа от '='
+            const double value = _fnEval(eqI + 1, endI - 1);
+            control.setArrayElem(name, idx, value);
+
+            currentWord = endI;
+            return;
         }
-        else
+
+        // ---------- Ветка: скалярное присваивание: name = ... ;
+        if (!(t1[0] == '=' && t1[1] == '\0'))
         {
+            printError("SET '=' not found\n");
+            halt();
+            return;
+        }
+
+        // Быстрый путь: ровно 4 токена: name = value ;
+        const char *t3 = getWord(3);
+        if (t3 && t3[0] == ';' && t3[1] == '\0')
+        {
+            const char *rhs = getWord(2);
+            if (!rhs)
+            {
+                printError("SET value not found\n");
+                halt();
+                return;
+            }
+
+            // x = число;
+            if (isNumber(rhs))
+            {
+                const double v = std::strtod(rhs, 0);
+                if (!control.setVar(name, v))
+                    printError("SET name not found", 1);
+
+                currentWord += 4; // name '=' value ';'
+                return;
+            }
+
+            // x = y;  (переменная справа)
+            // Это быстрее, чем вызывать общий вычислитель.
             double tmp = 0.0;
-            control.getVar(idxTok, tmp); // Предполагается, что внутри есть обработка ошибок
-            idx = (int)tmp;
-        }
-
-        // Вычисляем выражение справа от '='
-        const double value = _fnEval(eqI + 1, endI - 1);
-        control.setArrayElem(name, idx, value);
-
-        currentWord = endI;
-        return;
-    }
-
-    // ---------- Ветка: скалярное присваивание: name = ... ;
-    if (!(t1[0] == '=' && t1[1] == '\0'))
-    {
-        printError("SET '=' not found\n");
-        halt();
-        return;
-    }
-
-    // Быстрый путь: ровно 4 токена: name = value ;
-    const char *t3 = getWord(3);
-    if (t3 && t3[0] == ';' && t3[1] == '\0')
-    {
-        const char *rhs = getWord(2);
-        if (!rhs)
-        {
-            printError("SET value not found\n");
-            halt();
-            return;
-        }
-
-        // x = число;
-        if (isNumber(rhs))
-        {
-            const double v = std::strtod(rhs, 0);
-            if (!control.setVar(name, v))
+            control.getVar(rhs, tmp); // если переменной нет — ожидается внутренняя ошибка
+            if (!control.setVar(name, tmp))
                 printError("SET name not found", 1);
 
-            currentWord += 4; // name '=' value ';'
+            currentWord += 4;
             return;
         }
 
-        // x = y;  (переменная справа)
-        // Это быстрее, чем вызывать общий вычислитель.
-        double tmp = 0.0;
-        control.getVar(rhs, tmp); // если переменной нет — ожидается внутренняя ошибка
-        if (!control.setVar(name, tmp))
+        // Общий случай: name = <выражение...> ;
+        const int endI = foundNextWord(SYM().SEMI);
+        if (endI < 0)
+        {
+            printError("SET ';' not found\n");
+            halt();
+            return;
+        }
+
+        const double result = _fnEval(currentWord + 2, endI - 1);
+        if (!control.setVar(name, result))
             printError("SET name not found", 1);
 
-        currentWord += 4;
-        return;
+        currentWord = endI;
     }
-
-    // Общий случай: name = <выражение...> ;
-    const int endI = foundNextWord(";");
-    if (endI < 0)
-    {
-        printError("SET ';' not found\n");
-        halt();
-        return;
-    }
-
-    const double result = _fnEval(currentWord + 2, endI - 1);
-    if (!control.setVar(name, result))
-        printError("SET name not found", 1);
-
-    currentWord = endI;
-}
-
 
     void _opIF()
     {
         int closeParenthes = foundCloseParenthes();
-        int openBrace = foundNextWord("{");
+        int openBrace = foundNextWord(SYM().LBRACE);
         int closeBrace = foundCloseBrace();
         const char *openParenthes = getWord(1);
 
         // std::cout << "close Parenthes " << closeParenthes << " openBrace " << openBrace << " closeBrace " << closeBrace << "\n";
 
-        if (!openParenthes || std::strcmp(openParenthes, "(") != 0)
+        if (openParenthes != SYM().LP)
         {
             printError("IF \"(\" not found", 1);
             halt();
@@ -1025,7 +997,7 @@ void _opSet()
         {
             currentWord = closeBrace + 1;
             // const char *word = getWord(0);
-            // if (std::strcmp(word, "ELSE") == 0){
+            // if (std::strcmp1(word, "ELSE") == 0){
             //     _opELSE();
             // }
             // else{
@@ -1043,7 +1015,7 @@ void _opSet()
     void _opELSE()
     {
         const char *openBrace = getWord(1);
-        if (!openBrace || std::strcmp(openBrace, "{") != 0)
+        if (openBrace != SYM().LBRACE)
         {
             printError("ELSE \"{\" not found", 1);
             halt();
@@ -1068,11 +1040,11 @@ void _opSet()
     void _opWHILE()
     {
         int closeParenthes = foundCloseParenthes();
-        int openBrace = foundNextWord("{");
+        int openBrace = foundNextWord(SYM().LBRACE);
         int closeBrace = foundCloseBrace();
         const char *openParenthes = getWord(1);
 
-        if (!openParenthes || std::strcmp(openParenthes, "(") != 0)
+        if (openParenthes != SYM().LP)
         {
             printError("WHILE \"(\" not found", 1);
             halt();
@@ -1143,7 +1115,7 @@ void _opSet()
         {
             const char *word = getWord(1);
             // std::cout << "is else " << word << "\n";
-            if (std::strcmp(word, "ELSE") == 0)
+            if (word == SYM().ELSE)
             {
                 // std::cout << "IF ok, next ELSE\n";
                 int closeELSE = foundCloseBrace();
@@ -1174,15 +1146,15 @@ void _opSet()
         }
 
         // обработка команд
-        if (std::strcmp(word, "VAR") == 0)
+        if (word == SYM().VAR)
         {
             _opCreateVar();
         }
-        else if (std::strcmp(word, "PRINT") == 0)
+        else if (word == SYM().PRINT)
         {
             _opPrint();
         }
-        else if (std::strcmp(word, "PRINTLN") == 0)
+        else if (word == SYM().PRINTLN)
         {
             _opPrint(1);
         }
@@ -1196,39 +1168,39 @@ void _opSet()
             int gotoPROC = findPROC(word);
             currentWord = gotoPROC + 2; // name { ...
         }
-        else if (control.findVar(word) || control.findArray(word))
+        else if (getWord(1) == SYM().EQ || getWord(1) == SYM().LBRACKET)
         {
-            _opSet();
+            _opSet(); // внутри уже разберём, и если имя не найдено — выведем ошибку
         }
-        else if (std::strcmp(word, "IF") == 0)
+        else if (word == SYM().IF)
         {
             _opIF();
         }
-        else if (std::strcmp(word, "WHILE") == 0)
+        else if (word == SYM().WHILE)
         {
             _opWHILE();
         }
-        else if (std::strcmp(word, "}") == 0)
+        else if (word == SYM().RBRACE)
         {
             _opCLOSEBRACE();
         }
-        else if (std::strcmp(word, "ELSE") == 0)
+        else if (word == SYM().ELSE)
         {
             _opELSE();
         }
-        else if (std::strcmp(word, ";") == 0)
+        else if (word == SYM().SEMI)
         {
             nextWord();
         }
-        else if (std::strcmp(word, "HALT") == 0)
+        else if (word == SYM().HALT)
         {
             halt();
         }
-        else if (std::strcmp(word, "PROC") == 0)
+        else if (word == SYM().PROC)
         {
             _opPROC();
         }
-        else if (std::strcmp(word, "RETURN") == 0)
+        else if (word == SYM().RETURN)
         {
             _opRETURN();
         }
@@ -1288,7 +1260,7 @@ private:
             if (bufIndex > 0)
             {
                 buffer[bufIndex] = '\0';
-                words.push_back(strdup(buffer));
+                words.push_back(INTERN().intern(buffer));
                 bufIndex = 0;
             }
         };
@@ -1301,7 +1273,7 @@ private:
                 flushBuffer();
 
                 // 2) Открывающая кавычка как отдельный токен
-                words.push_back(strdup("\""));
+                words.push_back(SYM().QUOTE);
                 ++program;
 
                 // 3) Собираем содержимое строки с поддержкой любого экранирования
@@ -1332,12 +1304,12 @@ private:
 
                 // 4) Завершаем строковый буфер и сохраняем как отдельный токен
                 strBuffer[strIndex] = '\0';
-                words.push_back(strdup(strBuffer));
+                words.push_back(INTERN().intern(strBuffer));
 
                 // 5) Закрывающая кавычка как отдельный токен
                 if (*program == '"')
                 {
-                    words.push_back(strdup("\""));
+                    words.push_back(SYM().QUOTE);
                     ++program;
                 }
             }
@@ -1352,7 +1324,7 @@ private:
                 // операторы одиночного символа тоже отдельные токены
                 flushBuffer();
                 char op[2] = {*program, '\0'};
-                words.push_back(strdup(op));
+                words.push_back(INTERN().intern(op));
                 ++program;
             }
             else
@@ -1370,19 +1342,14 @@ private:
         // пост проход. Убираем !, = в !=
         for (size_t i = 0; i + 1 < words.size();)
         {
-            if (strcmp(words[i], "!") == 0 && strcmp(words[i + 1], "=") == 0)
+            if (words[i] == SYM().NOT && words[i + 1] == SYM().EQ)
             {
-                // Заменяем "!" на "!="
-                free(words[i]); // освобождаем старую строку
-                words[i] = strdup("!=");
-
-                // Удаляем "="
-                free(words[i + 1]);
-                words.erase(words.begin() + i + 1);
+                words[i] = SYM().NEQ;
+                words.erase(words.begin() + (i + 1));
             }
             else
             {
-                ++i; // иначе двигаемся дальше
+                ++i;
             }
         }
     }
