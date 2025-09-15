@@ -2,10 +2,12 @@
 #include <iostream>
 #include <vector>
 #include <unordered_set>
+#include <unordered_map>  // нужно для индексов
 #include <string>
 #include <string_view>
 #include <cstddef>
 #include <cstring> // Для strcpy, strlen
+
 
 struct variable
 {
@@ -180,7 +182,7 @@ public:
         {
             for (const auto &var : vars[level])
             {
-                if (std::strcmp(var.name, name) == 0)
+                if (std::strcmp(var.name, name) == 0)//ТУТ ПРОБЛЕМА
                 {
                     outValue = var.value;
                     return true;
@@ -196,7 +198,7 @@ public:
         {
             for (const auto &var : vars[level])
             {
-                if (std::strcmp(var.name, name) == 0)
+                if (std::strcmp(var.name, name) == 0)//ТУТ ПРОБЛЕМАит  
                 {
                     return true;
                 }
@@ -404,8 +406,6 @@ private:
     // Важное свойство: адреса строк стабильны на весь срок жизни Interner (мы их не мутируем)
     std::unordered_set<std::string, StringHash, StringEq> pool_;
     std::unordered_set<const char *, PtrHash, PtrEq> ptrs_;
-    using VarMap   = std::unordered_map<const char*, double, PtrHash, PtrEq>;
-using ArrMap   = std::unordered_map<const char*, std::vector<double>, PtrHash, PtrEq>;
 };
 
 // Глобальный доступ без ODR-проблем: единый инстанс на процесс
