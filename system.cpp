@@ -103,13 +103,11 @@ struct Symbols
        EQEQ = nullptr, NEQ = nullptr, LEQ = nullptr, GEQ = nullptr,
        LT = nullptr, GT = nullptr, COMMA = nullptr, QUOTE = nullptr, NOT = nullptr, CARET = nullptr, PERCENT = nullptr;
 
-    Id  ABS=nullptr, ACOS=nullptr, ASIN=nullptr, ATAN=nullptr, ATAN2=nullptr,
-            CEIL=nullptr, COS=nullptr, COSH=nullptr, EXP=nullptr, FAC=nullptr,
-            FLOOR=nullptr, LN=nullptr, LOG=nullptr, LOG10=nullptr, NCR=nullptr, NPR=nullptr,
-            PIK=nullptr, /*  'pi' назови PIK чтобы не путать с полем PERCENT  */
-            POW=nullptr, SIN=nullptr, SINH=nullptr, SQRT=nullptr, TAN=nullptr, TANH=nullptr;
-
-
+    Id ABS = nullptr, ACOS = nullptr, ASIN = nullptr, ATAN = nullptr, ATAN2 = nullptr,
+       CEIL = nullptr, COS = nullptr, COSH = nullptr, EXP = nullptr, FAC = nullptr,
+       FLOOR = nullptr, LN = nullptr, LOG = nullptr, LOG10 = nullptr, NCR = nullptr, NPR = nullptr,
+       PIK = nullptr, /*  'pi' назови PIK чтобы не путать с полем PERCENT  */
+        POW = nullptr, SIN = nullptr, SINH = nullptr, SQRT = nullptr, TAN = nullptr, TANH = nullptr;
 
     void init(Interner &I)
     {
@@ -152,15 +150,29 @@ struct Symbols
         CARET = I.intern("^");
         PERCENT = I.intern("%");
 
-
-        ABS=I.intern("abs");   ACOS=I.intern("acos");  ASIN=I.intern("asin");
-ATAN=I.intern("atan"); ATAN2=I.intern("atan2");
-CEIL=I.intern("ceil"); COS=I.intern("cos");   COSH=I.intern("cosh");
-EXP=I.intern("exp");   FAC=I.intern("fac");   FLOOR=I.intern("floor");
-LN=I.intern("ln");     LOG=I.intern("log");   LOG10=I.intern("log10");
-NCR=I.intern("ncr");   NPR=I.intern("npr");   PIK=I.intern("pi");
-POW=I.intern("pow");   SIN=I.intern("sin");   SINH=I.intern("sinh");
-SQRT=I.intern("sqrt"); TAN=I.intern("tan");   TANH=I.intern("tanh");
+        ABS = I.intern("abs");
+        ACOS = I.intern("acos");
+        ASIN = I.intern("asin");
+        ATAN = I.intern("atan");
+        ATAN2 = I.intern("atan2");
+        CEIL = I.intern("ceil");
+        COS = I.intern("cos");
+        COSH = I.intern("cosh");
+        EXP = I.intern("exp");
+        FAC = I.intern("fac");
+        FLOOR = I.intern("floor");
+        LN = I.intern("ln");
+        LOG = I.intern("log");
+        LOG10 = I.intern("log10");
+        NCR = I.intern("ncr");
+        NPR = I.intern("npr");
+        PIK = I.intern("pi");
+        POW = I.intern("pow");
+        SIN = I.intern("sin");
+        SINH = I.intern("sinh");
+        SQRT = I.intern("sqrt");
+        TAN = I.intern("tan");
+        TANH = I.intern("tanh");
 
         // const char *tiny_names[] = {
         //     "abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "cosh", "exp", "fac",
@@ -223,6 +235,64 @@ private:
     std::vector<ArrChange> arrLog;
     std::vector<size_t> varMarks{0}, arrMarks{0}; // индексы начала изменений уровня
 
+    static constexpr int kVSlots = 5;
+    static constexpr int kASlots = 5;
+
+    mutable Id v_id_[kVSlots] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+    mutable double *v_ptr_[kVSlots] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+    mutable int v_hand_ = 0;
+
+    mutable Id a_id_[kASlots] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+    mutable std::vector<double> *a_ptr_[kASlots] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+    mutable int a_hand_ = 0;
+
+    inline void clearHotCaches() noexcept
+    {
+        for (int i = 0; i < kVSlots; ++i)
+        {
+            v_id_[i] = nullptr;
+            v_ptr_[i] = nullptr;
+        }
+        for (int i = 0; i < kASlots; ++i)
+        {
+            a_id_[i] = nullptr;
+            a_ptr_[i] = nullptr;
+        }
+        v_hand_ = 0;
+        a_hand_ = 0;
+    }
+
+    inline double *cacheLookupVar(Id name) const noexcept
+    {
+        // быстрый проход по 5 слотам
+        for (int i = 0; i < kVSlots; ++i)
+            if (v_id_[i] == name)
+                return v_ptr_[i];
+        // промах → один lookup в liveVars
+        auto it = liveVars.find(name);
+        if (it == liveVars.end())
+            return nullptr;
+        // заносим в кольцевой слот
+        v_id_[v_hand_] = name;
+        v_ptr_[v_hand_] = it->second;
+        v_hand_ = (v_hand_ + 1) % kVSlots;
+        return it->second;
+    }
+
+    inline std::vector<double> *cacheLookupArr(Id name) const noexcept
+    {
+        for (int i = 0; i < kASlots; ++i)
+            if (a_id_[i] == name)
+                return a_ptr_[i];
+        auto it = liveArrays.find(name);
+        if (it == liveArrays.end())
+            return nullptr;
+        a_id_[a_hand_] = name;
+        a_ptr_[a_hand_] = it->second;
+        a_hand_ = (a_hand_ + 1) % kASlots;
+        return it->second;
+    }
+
 public:
     // --- Управление уровнями ---
     void inLevel()
@@ -234,6 +304,7 @@ public:
             arrFrames.emplace_back();
         varMarks.push_back(varLog.size());
         arrMarks.push_back(arrLog.size());
+        clearHotCaches();
     }
 
     void outLevel()
@@ -274,6 +345,7 @@ public:
         varFrames.pop_back();
         arrFrames.pop_back();
         --currentLevel;
+        clearHotCaches();
     }
 
     // --- Переменные ---
@@ -291,40 +363,41 @@ public:
             prev = itLive->second;
         varLog.push_back({name, prev});
         liveVars[name] = &it->second;
+        clearHotCaches();
     }
 
     bool setVar(Id name, double value)
     {
-        auto it = liveVars.find(name);
-        if (it == liveVars.end())
-            return false;
-        *it->second = value;
-        return true;
+        if (double *p = cacheLookupVar(name))
+        {
+            *p = value;
+            return true;
+        }
+        return false;
     }
 
     bool getVar(Id name, double &outValue) const
     {
-        auto it = liveVars.find(name);
-        if (it == liveVars.end())
-            return false;
-        outValue = *it->second;
-        return true;
+        if (double *p = cacheLookupVar(name))
+        {
+            outValue = *p;
+            return true;
+        }
+        return false;
     }
 
     bool findVar(Id name) const
     {
-        return liveVars.find(name) != liveVars.end();
+        return cacheLookupVar(name) != nullptr;
     }
 
     double *getVarPtr(Id name) const
-    {
-        auto it = liveVars.find(name);
-        return (it == liveVars.end()) ? nullptr : it->second;
+    { // тоже через кэш
+        return cacheLookupVar(name);
     }
     std::vector<double> *getArrayPtr(Id name) const
     {
-        auto it = liveArrays.find(name);
-        return (it == liveArrays.end()) ? nullptr : it->second;
+        return cacheLookupArr(name);
     }
 
     // --- Массивы ---
@@ -340,6 +413,7 @@ public:
             prev = itLive->second;
         arrLog.push_back({name, prev});
         liveArrays[name] = &it->second;
+        clearHotCaches();
     }
 
     void addArray(Id name, const std::vector<double> &values)
@@ -354,28 +428,30 @@ public:
             prev = itLive->second;
         arrLog.push_back({name, prev});
         liveArrays[name] = &it->second;
+        clearHotCaches();
     }
 
     bool findArray(Id name) const
     {
-        return liveArrays.find(name) != liveArrays.end();
+        return cacheLookupArr(name) != nullptr;
     }
 
     bool setArrayElem(Id name, size_t index, double value)
     {
-        auto it = liveArrays.find(name);
-        if (it == liveArrays.end())
-            return false;
-        auto &vec = *it->second;
-        if (index >= vec.size())
+        if (auto *vec = cacheLookupArr(name))
         {
-            std::cerr << "Index out of bounds for array '" << name << "': " << index
-                      << " >= " << vec.size() << "\n";
-            return false;
+            if (index >= vec->size())
+            {
+                std::cerr << "Index out of bounds for array '" << name << "': "
+                          << index << " >= " << vec->size() << "\n";
+                return false;
+            }
+            (*vec)[index] = value;
+            return true;
         }
-        vec[index] = value;
-        return true;
+        return false;
     }
+
     bool setArrayElem(Id name, int index, double value)
     {
         if (index < 0)
@@ -388,19 +464,20 @@ public:
 
     bool getArrayElem(Id name, size_t index, double &outValue) const
     {
-        auto it = liveArrays.find(name);
-        if (it == liveArrays.end())
-            return false;
-        auto &vec = *it->second;
-        if (index >= vec.size())
+        if (auto *vec = cacheLookupArr(name))
         {
-            std::cerr << "Index out of bounds for array '" << name << "': " << index
-                      << " >= " << vec.size() << "\n";
-            return false;
+            if (index >= vec->size())
+            {
+                std::cerr << "Index out of bounds for array '" << name << "': "
+                          << index << " >= " << vec->size() << "\n";
+                return false;
+            }
+            outValue = (*vec)[index];
+            return true;
         }
-        outValue = vec[index];
-        return true;
+        return false;
     }
+
     bool getArrayElem(Id name, int index, double &outValue) const
     {
         if (index < 0)
@@ -413,11 +490,12 @@ public:
 
     bool resizeArray(Id name, size_t newSize, double init = 0.0)
     {
-        auto it = liveArrays.find(name);
-        if (it == liveArrays.end())
-            return false;
-        it->second->assign(newSize, init);
-        return true;
+        if (auto *vec = cacheLookupArr(name))
+        {
+            vec->assign(newSize, init);
+            return true;
+        }
+        return false;
     }
 
     // --- Отладочная печать ---
