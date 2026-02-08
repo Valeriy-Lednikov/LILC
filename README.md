@@ -57,7 +57,7 @@ CONST VAR y = 10;
 
 Once declared, the value of a constant cannot be changed.
 
-> Attempting to reassign a constant results in an error.
+> Attempting to reassign a constant has no effect. The value of the constant remains unchanged.
 
 ---
 
@@ -129,10 +129,10 @@ Supports comparison operators:
 
 ```
 IF (a + b == 5) {
-    PRINTLN "=5";
+    PRINTLN "Result: 5";
 }
 ELSE {
-    PRINTLN "Not 5";
+    PRINTLN "Result is not 5";
 }
 ```
 
@@ -146,7 +146,7 @@ WHILE (a < 10) {
 }
 ```
 
-The loop executes while the condition evaluates to a non-zero value.
+The loop executes while the condition does not evaluate to logical 0.
 
 ---
 
