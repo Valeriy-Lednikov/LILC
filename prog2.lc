@@ -1,0 +1,13 @@
+VAR a;
+VAR b = 5;
+VAR c = 5 + 5 + 5;
+
+PRINTLN "Start";
+myFunk;
+PRINTLN a;
+PRINTLN b;
+PRINTLN c;
+
+PROC myFunk {
+    PRINTLN "worked!";
+}

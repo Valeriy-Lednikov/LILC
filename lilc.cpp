@@ -13,80 +13,6 @@ extern "C"
 
 const static char *oneCharOperators = "[]><{}();,+-*/^%=\0";
 
-const static char *tiny_key[] = {
-    "abs",
-    "acos",
-    "asin",
-    "atan",
-    "atan2",
-    "ceil",
-    "cos",
-    "cosh",
-    "exp",
-    "fac",
-    "floor",
-    "ln",
-    "log",
-    "log10",
-    "ncr",
-    "npr",
-    "pi",
-    "pow",
-    "sin",
-    "sinh",
-    "sqrt",
-    "tan",
-    "tanh",
-    "\0",
-};
-
-const static char *keywords_op[] = {
-    // Операторы
-    "==",
-    "!=",
-    ">=",
-    "<=",
-
-    // Функции
-    "abs",
-    "acos",
-    "asin",
-    "atan",
-    "atan2",
-    "ceil",
-    "cos",
-    "cosh",
-    "exp",
-    "fac",
-    "floor",
-    "ln",
-    "log",
-    "log10",
-    "ncr",
-    "npr",
-    "pi",
-    "pow",
-    "sin",
-    "sinh",
-    "sqrt",
-    "tan",
-    "tanh",
-
-    // Языковые операторы
-    "VAR",
-    "SET",
-    "IF",
-    "ELSE",
-    "FN",
-    "PROC",
-    "RETURN"
-    "WHILE",
-    "PRINTLN",
-    "PRINT",
-    "\0"
-
-};
-
 class lilc
 {
 private:
@@ -143,17 +69,6 @@ private:
                w == S->CARET || w == S->PERCENT;
     }
 
-    inline bool isKeyword(const char *word)
-    {
-        for (int i = 0; keywords_op[i][0] != '\0'; ++i)
-        {
-            if (strcmp(word, keywords_op[i]) == 0)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
 
    inline bool isOneCharOperator(char c)
     {
@@ -167,18 +82,6 @@ private:
         return false;
     }
 
-    inline bool isKeywordPrefix(const char *word)
-    {
-        size_t len = strlen(word);
-        for (int i = 0; keywords_op[i][0] != '\0'; ++i)
-        {
-            if (strncmp(word, keywords_op[i], len) == 0)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
 
 // В lilc: замени isTinyKey на это
 inline bool isTinyKey(const char* w) {
@@ -599,7 +502,7 @@ inline int foundCloseBrace() {
     void _opCreateVar()
     {
         const char *islineEnd = getWordUnchecked(2);
-        if (islineEnd == S->SEMI)
+        if (islineEnd == S->SEMI) //VAR x;
         {
             const char *varName = getWordUnchecked(1);
             if (!varName)
@@ -624,7 +527,7 @@ inline int foundCloseBrace() {
             printError("VAR name not found\n", 1);
             halt();
         }
-        if (openSquare == S->LBRACKET)
+        if (openSquare == S->LBRACKET) //VAR x[1000];
         {
             if (closeSquare == S->RBRACKET)
             {
@@ -640,6 +543,7 @@ inline int foundCloseBrace() {
         const char *varSet = getWordUnchecked(2);
         const char *valueStr = getWordUnchecked(3);
         const char *lineEnd2 = getWordUnchecked(4);
+        int lineEnd3 = foundNextWord(S->SEMI);
         if (!varName)
         { // Добавить условие корректности названия
             printError("VAR name not found\n", 1);
@@ -655,10 +559,16 @@ inline int foundCloseBrace() {
             printError("VAR value not found\n");
             halt();
         }
-        if (!lineEnd2 || lineEnd2 != S->SEMI)
-        {
-            printError("VAR \";\" not found\n", 4);
-            halt();
+        if (!lineEnd2 || lineEnd2 != S->SEMI) //var x = 5;
+        { //var x = 5 + 5 + 5;
+            double value = _fnEval(currentWord+3, lineEnd3 - 1);
+            
+            if (!control.setVar(varName, value))
+            {
+                control.addVar(varName, value); // создаём новую переменную
+            }
+            currentWord = lineEnd3;
+            return;
         }
         double value = std::atof(valueStr);
         if (!control.setVar(varName, value))
@@ -759,8 +669,8 @@ inline int foundCloseBrace() {
             {
                 std::string t = std::to_string(value) + "\n";
                 printOut(t);
-            }
-            std::cout << std::fixed << std::setprecision(15) << value << std::endl;
+            }   
+            std::cout << std::setprecision(15) << std::defaultfloat  << value << std::endl;
         }
         else
         {
@@ -768,7 +678,7 @@ inline int foundCloseBrace() {
             {
                 printOut(std::to_string(value));
             }
-            std::cout << std::fixed << std::setprecision(15) << value;
+            std::cout << std::setprecision(15) << std::defaultfloat  << value;
         }
         if (!isArray)
         {

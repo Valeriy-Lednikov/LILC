@@ -37,10 +37,27 @@ const char *loadFile(const char *filename)
     return buffer; // Возвращаем указатель (нужно будет освободить вручную!)
 }
 
+void calc()
+{
+    int arr[10000] = {0}; // Инициализация нулями
+    int i = 0;
+    int j = 0;
+
+    while (j < 100)
+    {
+        while (i < 10000)
+        {
+            arr[i] = 1 + arr[i] * arr[i];
+            i = i + 1;
+        }
+        i = 0;
+        j = j + 1;
+    }
+}
 
 int main(int argc, char *argv[])
 {
-    const char *text = loadFile("prog2.lc");
+    const char *text = loadFile("prog1.lc");
     lilc interpreter;
 
     // interpreter.loadProgram("VAR x; WHILE ( #x < 10 ) { PRINTLN x ; IF ( #x == 5 ) { PRINTLN \"X5!\";} SET x = #x + 1;} ");
@@ -48,15 +65,25 @@ int main(int argc, char *argv[])
     if (text)
     {
         interpreter.loadProgram(text);
+
         //interpreter.printWords();
 
-       
+
+        
         {
             auto start = std::chrono::high_resolution_clock::now();
             interpreter.interpretate();
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double, std::milli> duration = end - start;
             std::cout << "LILC: " << duration.count() << " ms" << std::endl;
+        }
+        {
+
+            auto start = std::chrono::high_resolution_clock::now();
+            calc();
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double, std::milli> duration = end - start;
+            std::cout << "C++: " << duration.count() << " ms" << std::endl;
         }
     }
 

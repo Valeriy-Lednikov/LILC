@@ -93,7 +93,7 @@ inline std::unordered_set<Id, PtrHash, PtrEq> &TINY()
 struct Symbols
 {
     // Ключевые слова
-    Id VAR = nullptr, SET = nullptr, IF = nullptr, ELSE = nullptr, WHILE = nullptr,
+    Id VAR = nullptr, CONST = nullptr, SET = nullptr, IF = nullptr, ELSE = nullptr, WHILE = nullptr,
        PROC = nullptr, RETURN = nullptr, PRINT = nullptr, PRINTLN = nullptr, HALT = nullptr;
 
     // Разделители/операторы
@@ -113,6 +113,7 @@ struct Symbols
     {
         // ключевые слова
         VAR = I.intern("VAR");
+        CONST = I.intern("CONST");
         SET = I.intern("SET");
         IF = I.intern("IF");
         ELSE = I.intern("ELSE");
@@ -194,8 +195,10 @@ struct variable
 {
     Id id = nullptr;
     double value = 0.0;
+    bool isConst = false;
+
     variable() = default;
-    variable(Id id_, double v) : id(id_), value(v) {}
+    variable(Id id_, double v, bool c = false) : id(id_), value(v), isConst(c) {}
 };
 
 struct array_var
