@@ -1,113 +1,260 @@
-# EN
+# Simple Interpreted Language
 
-This is my project implementing a simple interpreted language.
+This project is an implementation of a small, simple interpreted programming language.
+The language is designed to be minimal, readable, and easy to extend.
 
-## Temporary Features
+It supports variables, constants, procedures, scoped blocks, control flow, and built-in math functions.
 
-A `#` symbol is required before variable names in expression evaluation contexts (`if`, `while`, `set`).
+---
+
+## Key Features
+
+- Interpreted execution
+- Variables and constants
+- Expression-based assignments
+- Procedures (functions without arguments for now)
+- Block-based variable scoping using `{ }` (similar to C)
+- Conditional statements
+- Loops
+- Built-in math functions
+- Simple I/O
+
+---
 
 ## Language Syntax
 
-**VAR** – declares a new variable
+### Variables
 
-`VAR x;` – creates a variable `x` with value 0
+#### Variable declaration
 
-`VAR x = 5;` – creates a variable `x` with value 5
+```
+VAR x;
+```
 
-`VAR x = #a + #b;` *(WIP)* – creates a variable with the value of the expression result
+Creates a variable `x` with a default value of `0`.
 
----
+```
+VAR x = 5;
+```
 
-**SET** – assigns a value to a variable
+Creates a variable `x` with an initial value of `5`.
 
-`SET x = 5;` – sets the value of `x` to 5
+```
+VAR x = a + b * 2;
+```
 
-`SET x = #a + #b;` – sets the value of `x` as the result of the expression
-
----
-
-**HALT** – forces interpreter termination
-
----
-
-**IF** – conditional statement
-
-Supports logical operators: `==`, `!=`, `>`, `<`, `>=`, `<=`
-
-`IF ( #x + #y + sin(30) * 6 == #res ) { //code }` – executes the code if the condition is true
-
-`ELSE { //code }` – executes the else block if the IF condition evaluates to logical 0
+Creates a variable and assigns the result of an expression.
 
 ---
 
-**WHILE** – loop
+### Constants
 
-`WHILE ( #x < 10 ) { //code }` – executes the code in a loop while the condition is true
+Constants are immutable variables.
 
----
+```
+CONST VAR y = 10;
+```
 
-**PRINT** – outputs text or a variable
+Once declared, the value of a constant cannot be changed.
 
-**PRINTLN** – outputs text or a variable and adds a newline
-
-`PRINT "Value x = ";` – outputs the text `"Value x = "`
-
-`PRINTLN x;` – outputs the value of `x` and moves to the next line
+> Attempting to reassign a constant results in an error.
 
 ---
 
-# RU
+### Assignment
 
-Это мой проект, реализующий простой интерпретируемый язык.
+Variables are assigned using the `=` operator.
 
-## Временные особенности
+```
+x = 42;
+x = x + 1;
+```
 
-Символ `#` обязателен перед названием переменных в контексте вычисления выражений (`if`, `while`, `set`).
-
-## Синтаксис языка
-
-**VAR** – объявляет новую переменную
-
-`VAR x;` – создаёт переменную `x` со значением 0
-
-`VAR x = 5;` – создаёт переменную `x` со значением 5
-
-`VAR x = #a + #b;` *(в разработке)* – создаёт переменную со значением результата выражения
+Assignments support full expressions.
 
 ---
 
-**SET** – присваивает значение переменной
+### Procedures
 
-`SET x = 5;` – устанавливает значение `x` равным 5
+Procedures are reusable blocks of code.
 
-`SET x = #a + #b;` – устанавливает значение `x` как результат выражения
+```
+PROC myFunc {
+    PRINTLN "Hello from procedure!";
+}
+```
 
----
+Calling a procedure:
 
-**HALT** – принудительно завершает интерпретацию
-
----
-
-**IF** – условный оператор
-
-Поддерживает логические операторы: `==`, `!=`, `>`, `<`, `>=`, `<=`
-
-`IF ( #x + #y + sin(30) * 6 == #res ) { //код }` – выполняет код, если условие истинно
-
-`ELSE { //код }` – выполняет блок else, если условие `IF` возвращает логический 0
+```
+myFunc;
+```
 
 ---
 
-**WHILE** – цикл
+### Control Flow
 
-`WHILE ( #x < 10 ) { //код }` – выполняет код в цикле, пока условие истинно
+#### IF / ELSE
+
+Supports comparison operators:
+`==`, `!=`, `<`, `>`, `<=`, `>=`
+
+```
+IF (a + b == 5) {
+    PRINTLN "=5";
+}
+ELSE {
+    PRINTLN "Not 5";
+}
+```
 
 ---
 
-**PRINT** – выводит текст или переменную
+#### WHILE loop
 
-**PRINTLN** – выводит текст или переменную и добавляет перенос строки
+```
+WHILE (a < 10) {
+    a = a + 1;
+}
+```
 
-`PRINT "Value x = ";` – выводит текст `"value x = "`
+The loop executes while the condition evaluates to a non-zero value.
 
-`PRINTLN x;` – выводит значение `x` и переходит на следующую строку
+---
+
+### Scope
+
+Blocks defined with `{ }` create a new variable scope.
+
+```
+VAR x = 1;
+
+IF (x == 1) {
+    VAR x = 10;
+    PRINTLN x; // prints 10
+}
+
+PRINTLN x; // prints 1
+```
+
+---
+
+### Input / Output
+
+#### PRINT
+
+Outputs text or a value without a newline.
+
+```
+PRINT "Value: ";
+```
+
+#### PRINTLN
+
+Outputs text or a value followed by a newline.
+
+```
+PRINTLN x;
+```
+
+---
+
+### Program Termination
+
+#### HALT
+
+Immediately stops interpreter execution.
+
+```
+HALT;
+```
+
+---
+
+## Built-in Math Functions
+
+The language supports a set of built-in mathematical functions:
+
+```
+abs, acos, asin, atan, atan2,
+ceil, cos, cosh, exp, fac,
+floor, ln, log, log10,
+ncr, npr, pi, pow,
+sin, sinh, sqrt,
+tan, tanh
+```
+
+Example:
+
+```
+VAR angle = 30;
+VAR result = sin(angle) * 2;
+PRINTLN result;
+```
+
+---
+
+## Example Program
+
+```
+VAR a;
+CONST VAR b = 5;
+VAR c = 5 + 5 + 5;
+
+PRINT "Program ";
+PRINTLN "Start";
+
+myFunc;
+
+PRINTLN a;
+PRINTLN b;
+PRINTLN c;
+
+IF (a + b == 5) {
+    PRINTLN "=5";
+}
+ELSE {
+    PRINTLN "Not 5";
+}
+
+WHILE (a < 10) {
+    a = a + 1;
+}
+
+PROC myFunc {
+    PRINTLN "worked!";
+}
+```
+
+---
+
+## Notes
+
+- Expressions are evaluated dynamically at runtime
+- Non-zero values are treated as `true`
+- Zero is treated as `false`
+- The language is under active development and syntax may evolve
+
+---
+
+## License
+
+MIT License
+
+Copyright (c) 2026 Valeriy Lednikov
+Original project:
+https://github.com/Valeriy-Lednikov/LILC
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
