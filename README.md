@@ -73,6 +73,34 @@ x = x + 1;
 Assignments support full expressions.
 
 ---
+### Arrays
+
+The language supports fixed-size arrays.
+
+#### Declaration
+
+```
+VAR arr[10000];
+```
+
+Creates an array arr with a fixed size of 10000 elements.
+All elements are initialized to 0.
+
+#### Accessing elements
+
+Array elements are accessed using square brackets.
+
+```
+arr[i];
+```
+
+#### Notes
+
+Array indices are zero-based
+
+Accessing an index outside the array bounds results in a runtime error
+
+Only variables or integer literals are allowed inside square brackets. Expressions are not supported. WIP.
 
 ### Procedures
 
