@@ -215,34 +215,43 @@ class controller
 private:
     int currentLevel = 0;
 
+
+    struct VarEntry
+    {
+        double value = 0.0;
+        bool isConst = false;
+    };
+
     // Фреймы, владеющие значениями
-    std::vector<std::unordered_map<Id, double, PtrHash, PtrEq>> varFrames = {{}};
+    std::vector<std::unordered_map<Id, VarEntry, PtrHash, PtrEq>> varFrames = {{}};
     std::vector<std::unordered_map<Id, std::vector<double>, PtrHash, PtrEq>> arrFrames = {{}};
 
     // Живой видимый слой: быстрые лукапы
-    std::unordered_map<Id, double *, PtrHash, PtrEq> liveVars;
+    std::unordered_map<Id, VarEntry *, PtrHash, PtrEq> liveVars;
     std::unordered_map<Id, std::vector<double> *, PtrHash, PtrEq> liveArrays;
 
     // Журнал изменений для отката уровня
     struct VarChange
     {
         Id id;
-        double *prev;
+        VarEntry *prev;
     };
     struct ArrChange
     {
         Id id;
         std::vector<double> *prev;
     };
+
     std::vector<VarChange> varLog;
     std::vector<ArrChange> arrLog;
     std::vector<size_t> varMarks{0}, arrMarks{0}; // индексы начала изменений уровня
+
 
     static constexpr int kVSlots = 5;
     static constexpr int kASlots = 5;
 
     mutable Id v_id_[kVSlots] = {nullptr, nullptr, nullptr, nullptr, nullptr};
-    mutable double *v_ptr_[kVSlots] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+    mutable VarEntry *v_ptr_[kVSlots] = {nullptr, nullptr, nullptr, nullptr, nullptr};
     mutable int v_hand_ = 0;
 
     mutable Id a_id_[kASlots] = {nullptr, nullptr, nullptr, nullptr, nullptr};
@@ -265,7 +274,7 @@ private:
         a_hand_ = 0;
     }
 
-    inline double *cacheLookupVar(Id name) const noexcept
+    inline VarEntry  *cacheLookupVar(Id name) const noexcept
     {
         // быстрый проход по 5 слотам
         for (int i = 0; i < kVSlots; ++i)
@@ -352,18 +361,24 @@ public:
     }
 
     // --- Переменные ---
-    void addVar(Id name) { addVar(name, 0.0); }
+    void addVar(Id name) { addVar(name, 0.0, false); }
+    void addVar(Id name, double value) { addVar(name, value, false); }
 
-    void addVar(Id name, double value)
+    void addVar(Id name, double value, bool isConst)
     {
         auto &frame = varFrames[currentLevel];
-        auto [it, inserted] = frame.emplace(name, value);
-        if (!inserted)
-            it->second = value; // переопределили на уровне
 
-        double *prev = nullptr;
+        auto [it, inserted] = frame.emplace(name, VarEntry{value, isConst});
+        if (!inserted)
+        {
+            it->second.value = value;
+            it->second.isConst = isConst;
+        }
+
+        VarEntry *prev = nullptr;
         if (auto itLive = liveVars.find(name); itLive != liveVars.end())
             prev = itLive->second;
+
         varLog.push_back({name, prev});
         liveVars[name] = &it->second;
         clearHotCaches();
@@ -371,19 +386,22 @@ public:
 
     bool setVar(Id name, double value)
     {
-        if (double *p = cacheLookupVar(name))
+        if (VarEntry *p = cacheLookupVar(name))
         {
-            *p = value;
+            if (p->isConst)
+                return false; // константу нельзя менять
+            p->value = value;
             return true;
         }
         return false;
     }
 
+
     bool getVar(Id name, double &outValue) const
     {
-        if (double *p = cacheLookupVar(name))
+        if (VarEntry  *p = cacheLookupVar(name))
         {
-            outValue = *p;
+            outValue = p->value;
             return true;
         }
         return false;
@@ -396,7 +414,9 @@ public:
 
     double *getVarPtr(Id name) const
     { // тоже через кэш
-        return cacheLookupVar(name);
+        if (VarEntry *p = cacheLookupVar(name))
+            return &p->value;
+        return nullptr;
     }
     std::vector<double> *getArrayPtr(Id name) const
     {
@@ -507,9 +527,12 @@ public:
         std::cout << "Level " << currentLevel << " variables:\n";
         for (const auto &kv : varFrames[currentLevel])
         {
-            std::cout << kv.first << " = " << kv.second << "\n";
+            std::cout << kv.first << " = " << kv.second.value;
+            if (kv.second.isConst) std::cout << " [CONST]";
+            std::cout << "\n";
         }
     }
+
 
     void printAllLevels() const
     {
@@ -519,10 +542,13 @@ public:
             std::cout << "Level " << lvl << ":\n";
             for (const auto &kv : varFrames[lvl])
             {
-                std::cout << "  " << kv.first << " = " << kv.second << "\n";
+                std::cout << "  " << kv.first << " = " << kv.second.value;
+                if (kv.second.isConst) std::cout << " [CONST]";
+                std::cout << "\n";
             }
         }
     }
+
 
     // --- Снимки уровня для UI/отладки ---
     const std::vector<variable> &getVarsAtLevel(int level) const
@@ -530,7 +556,7 @@ public:
         static std::vector<variable> tmp;
         tmp.clear();
         for (const auto &kv : varFrames[level])
-            tmp.emplace_back(kv.first, kv.second);
+            tmp.emplace_back(kv.first, kv.second.value, kv.second.isConst);
         return tmp;
     }
 

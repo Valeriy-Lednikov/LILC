@@ -499,7 +499,7 @@ inline int foundCloseBrace() {
         control.outLevel();
     }
 
-    void _opCreateVar()
+    void _opCreateVar(bool isConst = false )
     {
         const char *islineEnd = getWordUnchecked(2);
         if (islineEnd == S->SEMI) //VAR x;
@@ -512,7 +512,7 @@ inline int foundCloseBrace() {
             }
             if (!control.setVar(varName, 0))
             {
-                control.addVar(varName, 0); // создаём новую переменную
+                control.addVar(varName, 0, isConst); // создаём новую переменную
             }
             currentWord += 2;
             return;
@@ -565,7 +565,7 @@ inline int foundCloseBrace() {
             
             if (!control.setVar(varName, value))
             {
-                control.addVar(varName, value); // создаём новую переменную
+                control.addVar(varName, value, isConst); // создаём новую переменную
             }
             currentWord = lineEnd3;
             return;
@@ -573,7 +573,7 @@ inline int foundCloseBrace() {
         double value = std::atof(valueStr);
         if (!control.setVar(varName, value))
         {
-            control.addVar(varName, value); // создаём новую переменную
+            control.addVar(varName, value, isConst); // создаём новую переменную
         }
         currentWord += 4;
     }
@@ -1232,7 +1232,12 @@ inline int foundCloseBrace() {
         }
 
         // обработка команд
-        if (word == S->VAR)
+        if (word == S->CONST){
+
+            currentWord +=1;
+            _opCreateVar(true);
+        }   
+        else if (word == S->VAR)
         {
             _opCreateVar();
         }
