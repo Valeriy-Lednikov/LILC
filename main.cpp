@@ -40,7 +40,7 @@ const char *loadFile(const char *filename)
 
 int main(int argc, char *argv[])
 {
-    const char *text = loadFile("prog2.lc");
+    const char *text = loadFile("LILC_PROG/prog2.lc");
     lilc interpreter;
 
 
