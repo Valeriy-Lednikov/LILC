@@ -120,6 +120,22 @@ myFunc;
 
 ---
 
+#### Procedures and RETURN
+
+Procedures are reusable blocks of code.
+
+```
+PROC myFunc {
+    PRINTLN "Start of procedure";
+
+    IF (someCondition) {
+        RETURN;  // exits the procedure immediately
+    }
+
+    PRINTLN "This line will not run if RETURN is executed";
+}
+```
+
 ### Control Flow
 
 #### IF / ELSE

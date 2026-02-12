@@ -396,6 +396,16 @@ public:
         return false;
     }
 
+    bool isVarConstant(Id name){
+        if (VarEntry *p = cacheLookupVar(name))
+        {
+            if (p->isConst){
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     bool getVar(Id name, double &outValue) const
     {

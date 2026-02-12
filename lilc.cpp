@@ -69,8 +69,7 @@ private:
                w == S->CARET || w == S->PERCENT;
     }
 
-
-   inline bool isOneCharOperator(char c)
+    inline bool isOneCharOperator(char c)
     {
         for (int i = 0; oneCharOperators[i] != '\0'; ++i)
         {
@@ -82,22 +81,33 @@ private:
         return false;
     }
 
-
-// В lilc: замени isTinyKey на это
-inline bool isTinyKey(const char* w) {
-    switch (w[0]) {
-        case 'a': return w==SYM().ABS || w==SYM().ACOS || w==SYM().ASIN || w==SYM().ATAN || w==SYM().ATAN2;
-        case 'c': return w==SYM().CEIL || w==SYM().COS || w==SYM().COSH;
-        case 'e': return w==SYM().EXP;
-        case 'f': return w==SYM().FAC || w==SYM().FLOOR;
-        case 'l': return w==SYM().LN || w==SYM().LOG || w==SYM().LOG10;
-        case 'n': return w==SYM().NCR || w==SYM().NPR;
-        case 'p': return w==SYM().PIK || w==SYM().POW;
-        case 's': return w==SYM().SIN || w==SYM().SINH || w==SYM().SQRT;
-        case 't': return w==SYM().TAN || w==SYM().TANH;
-        default:  return false;
+    // В lilc: замени isTinyKey на это
+    inline bool isTinyKey(const char *w)
+    {
+        switch (w[0])
+        {
+        case 'a':
+            return w == SYM().ABS || w == SYM().ACOS || w == SYM().ASIN || w == SYM().ATAN || w == SYM().ATAN2;
+        case 'c':
+            return w == SYM().CEIL || w == SYM().COS || w == SYM().COSH;
+        case 'e':
+            return w == SYM().EXP;
+        case 'f':
+            return w == SYM().FAC || w == SYM().FLOOR;
+        case 'l':
+            return w == SYM().LN || w == SYM().LOG || w == SYM().LOG10;
+        case 'n':
+            return w == SYM().NCR || w == SYM().NPR;
+        case 'p':
+            return w == SYM().PIK || w == SYM().POW;
+        case 's':
+            return w == SYM().SIN || w == SYM().SINH || w == SYM().SQRT;
+        case 't':
+            return w == SYM().TAN || w == SYM().TANH;
+        default:
+            return false;
+        }
     }
-}
 
     inline bool compareChar(const char *str1, const char *str2)
     {
@@ -112,16 +122,20 @@ inline bool isTinyKey(const char* w) {
         return false;
     }
 
-inline bool isNumber(const char* s) {
-    if (!s || !*s) return false;
-    // быстрые односимвольные цифры
-    unsigned char c0 = (unsigned char)s[0];
-    if (!s[1]) return (c0 >= '0' && c0 <= '9');
-    // дальше — как было
-    for (const unsigned char* p=(const unsigned char*)s; *p; ++p)
-        if (*p < '0' || *p > '9') return false;
-    return true;
-}
+    inline bool isNumber(const char *s)
+    {
+        if (!s || !*s)
+            return false;
+        // быстрые односимвольные цифры
+        unsigned char c0 = (unsigned char)s[0];
+        if (!s[1])
+            return (c0 >= '0' && c0 <= '9');
+        // дальше — как было
+        for (const unsigned char *p = (const unsigned char *)s; *p; ++p)
+            if (*p < '0' || *p > '9')
+                return false;
+        return true;
+    }
 
 public:
     bool isHalted = false;
@@ -247,14 +261,17 @@ public:
         }
     }
 
-inline int foundNextWord(const char* tok) const {
-    const char* const* W = words.data();
-    const int n = (int)words.size();
-    for (int i = currentWord + 1; i < n; ++i) {
-        if (W[i] == tok) return i;
+    inline int foundNextWord(const char *tok) const
+    {
+        const char *const *W = words.data();
+        const int n = (int)words.size();
+        for (int i = currentWord + 1; i < n; ++i)
+        {
+            if (W[i] == tok)
+                return i;
+        }
+        return -1;
     }
-    return -1;
-}
     // int foundNextWord(const char *word) const
     // {
     //     word = INTERN().intern(word);
@@ -453,33 +470,51 @@ inline int foundNextWord(const char* tok) const {
         return expressionBuffer;
     }
 
-inline int foundCloseBrace() {
-    const char* const* W = words.data();
-    const int n = (int)words.size();
-    int level = 0;
-    for (int i = currentWord + 1; i < n; ++i) {
-        const char* w = W[i];
-        if (w == SYM().LBRACE) { ++level; }
-        else if (w == SYM().RBRACE) {
-            if (--level == 0) return i;
+    inline int foundCloseBrace()
+    {
+        const char *const *W = words.data();
+        const int n = (int)words.size();
+        int level = 0;
+        for (int i = currentWord + 1; i < n; ++i)
+        {
+            const char *w = W[i];
+            if (w == SYM().LBRACE)
+            {
+                ++level;
+            }
+            else if (w == SYM().RBRACE)
+            {
+                if (--level == 0)
+                    return i;
+            }
         }
+        printError("Closing } not found\n");
+        halt();
+        return -1;
     }
-    printError("Closing } not found\n"); halt(); return -1;
-}
 
-    inline int foundCloseParenthes() {
-    const char* const* W = words.data();
-    const int n = (int)words.size();
-    int level = 0;
-    for (int i = currentWord + 1; i < n; ++i) {
-        const char* w = W[i];
-        if (w == SYM().LP) { ++level; }
-        else if (w == SYM().RP) {
-            if (--level == 0) return i;
+    inline int foundCloseParenthes()
+    {
+        const char *const *W = words.data();
+        const int n = (int)words.size();
+        int level = 0;
+        for (int i = currentWord + 1; i < n; ++i)
+        {
+            const char *w = W[i];
+            if (w == SYM().LP)
+            {
+                ++level;
+            }
+            else if (w == SYM().RP)
+            {
+                if (--level == 0)
+                    return i;
+            }
         }
+        printError("Closing ) not found\n");
+        halt();
+        return -1;
     }
-    printError("Closing ) not found\n"); halt(); return -1;
-}
 
     void halt()
     {
@@ -499,10 +534,10 @@ inline int foundCloseBrace() {
         control.outLevel();
     }
 
-    void _opCreateVar(bool isConst = false )
+    void _opCreateVar(bool isConst = false)
     {
         const char *islineEnd = getWordUnchecked(2);
-        if (islineEnd == S->SEMI) //VAR x;
+        if (islineEnd == S->SEMI) // VAR x;
         {
             const char *varName = getWordUnchecked(1);
             if (!varName)
@@ -527,7 +562,7 @@ inline int foundCloseBrace() {
             printError("VAR name not found\n", 1);
             halt();
         }
-        if (openSquare == S->LBRACKET) //VAR x[1000];
+        if (openSquare == S->LBRACKET) // VAR x[1000];
         {
             if (closeSquare == S->RBRACKET)
             {
@@ -559,10 +594,10 @@ inline int foundCloseBrace() {
             printError("VAR value not found\n");
             halt();
         }
-        if (!lineEnd2 || lineEnd2 != S->SEMI) //var x = 5;
-        { //var x = 5 + 5 + 5;
-            double value = _fnEval(currentWord+3, lineEnd3 - 1);
-            
+        if (!lineEnd2 || lineEnd2 != S->SEMI) // var x = 5;
+        {                                     // var x = 5 + 5 + 5;
+            double value = _fnEval(currentWord + 3, lineEnd3 - 1);
+
             if (!control.setVar(varName, value))
             {
                 control.addVar(varName, value, isConst); // создаём новую переменную
@@ -669,8 +704,8 @@ inline int foundCloseBrace() {
             {
                 std::string t = std::to_string(value) + "\n";
                 printOut(t);
-            }   
-            std::cout << std::setprecision(15) << std::defaultfloat  << value << std::endl;
+            }
+            std::cout << std::setprecision(15) << std::defaultfloat << value << std::endl;
         }
         else
         {
@@ -678,7 +713,7 @@ inline int foundCloseBrace() {
             {
                 printOut(std::to_string(value));
             }
-            std::cout << std::setprecision(15) << std::defaultfloat  << value;
+            std::cout << std::setprecision(15) << std::defaultfloat << value;
         }
         if (!isArray)
         {
@@ -858,8 +893,16 @@ inline int foundCloseBrace() {
                 {
                     const double v = std::strtod(rhs, 0);
                     if (!control.setVar(name, v))
-                        printError("SET name not found", 1);
-
+                    {
+                        if (control.isVarConstant(name))
+                        {
+                            printWarning("Attempt to assign a value to a constant", 1);
+                        }
+                        else
+                        {
+                            printError("SET name not found", 1);
+                        }
+                    }
                     currentWord += 4; // name '=' value ';'
                     return;
                 }
@@ -869,8 +912,16 @@ inline int foundCloseBrace() {
                 double tmp = 0.0;
                 control.getVar(rhs, tmp); // если переменной нет — ожидается внутренняя ошибка
                 if (!control.setVar(name, tmp))
-                    printError("SET name not found", 1);
-
+                {
+                    if (control.isVarConstant(name))
+                    {
+                        printWarning("Attempt to assign a value to a constant", 1);
+                    }
+                    else
+                    {
+                        printError("SET name not found", 1);
+                    }
+                }
                 currentWord += 4;
                 return;
             }
@@ -898,7 +949,14 @@ inline int foundCloseBrace() {
                     double cur = 0.0;
                     if (!control.getVar(name, cur) || !control.setVar(name, cur + 1.0))
                     {
-                        printError("SET name not found", 1);
+                        if (control.isVarConstant(name))
+                        {
+                            printWarning("Attempt to assign a value to a constant", 1);
+                        }
+                        else
+                        {
+                            printError("SET name not found", 1);
+                        }
                         halt();
                         return;
                     }
@@ -912,7 +970,14 @@ inline int foundCloseBrace() {
                     double cur = 0.0;
                     if (!control.getVar(name, cur) || !control.setVar(name, cur - 1.0))
                     {
-                        printError("SET name not found", 1);
+                        if (control.isVarConstant(name))
+                        {
+                            printWarning("Attempt to assign a value to a constant", 1);
+                        }
+                        else
+                        {
+                            printError("SET name not found", 1);
+                        }
                         halt();
                         return;
                     }
@@ -933,7 +998,14 @@ inline int foundCloseBrace() {
 
         const double result = _fnEval(currentWord + 2, endI - 1);
         if (!control.setVar(name, result))
-            printError("SET name not found", 1);
+            if (control.isVarConstant(name))
+            {
+                printWarning("Attempt to assign a value to a constant", 1);
+            }
+            else
+            {
+                printError("SET name not found", 1);
+            }
 
         currentWord = endI; // встанем на ';' — tick() сам перепрыгнет
     }
@@ -1232,11 +1304,12 @@ inline int foundCloseBrace() {
         }
 
         // обработка команд
-        if (word == S->CONST){
+        if (word == S->CONST)
+        {
 
-            currentWord +=1;
+            currentWord += 1;
             _opCreateVar(true);
-        }   
+        }
         else if (word == S->VAR)
         {
             _opCreateVar();
@@ -1339,6 +1412,16 @@ inline int foundCloseBrace() {
             printOut(t);
         }
         std::cout << "ERROR in word <" << currentWord + word << "><" << words[currentWord + word] << ">" << " - " << text << "\n";
+    }
+
+    void printWarning(const char *text, int word = 0)
+    {
+        std::string t = "WARNING in word <" + std::to_string(currentWord) + std::to_string(word) + "><" + words[currentWord + word] + ">" + " - \n" + text + "\n";
+        if (printOut)
+        {
+            printOut(t);
+        }
+        std::cout << "WARNING in word <" << currentWord + word << "><" << words[currentWord + word] << ">" << " - " << text << "\n";
     }
 
 private:

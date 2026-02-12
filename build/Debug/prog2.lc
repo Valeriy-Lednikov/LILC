@@ -1,0 +1,28 @@
+VAR a;
+CONST VAR b = 5;
+VAR c = 5 + 5 + 5;
+b = 222;
+
+
+
+PRINT "Program "
+PRINTLN "Start";
+myFunk;
+PRINTLN a;
+PRINTLN b;
+PRINTLN c;
+
+IF (a + b == 5){
+    PRINTLN "=5";
+}
+ELSE {
+    PRINTLN "Not 5";
+}
+
+WHILE (a < 10){
+    a = a + 1;
+}
+
+PROC myFunk {
+    PRINTLN "worked!";
+}

@@ -43,7 +43,6 @@ int main(int argc, char *argv[])
     const char *text = loadFile("prog2.lc");
     lilc interpreter;
 
-    // interpreter.loadProgram("VAR x; WHILE ( #x < 10 ) { PRINTLN x ; IF ( #x == 5 ) { PRINTLN \"X5!\";} SET x = #x + 1;} ");
 
     if (text)
     {
@@ -59,9 +58,4 @@ int main(int argc, char *argv[])
             std::cout << "LILC: " << duration.count() << " ms" << std::endl;
         }
     }
-
-    // const char *c = "sqrt(5^2+7^2+11^2+(8-2)^2)";
-    // double r = te_interp(c, 0);
-    // std::cout << "The expressionres " << r << "\n";
-    // return 0;
 }
